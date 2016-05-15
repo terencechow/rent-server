@@ -8,17 +8,21 @@ CREATE KEYSPACE rent WITH REPLICATION = { 'class' : 'SimpleStrategy', 'replicati
 
 USE rent;
 
-CREATE TABLE users_by_id(
+CREATE TABLE users_by_email(
 	id uuid,
 	name text,
 	email text,
-	pass text,
+	hash text,
 	latlng varchar,
-	post_ids list<timeuuid>,
 	session_key text,
-	session_expiry timestamp,
-	chats set<uuid>,
-	PRIMARY KEY(id));
+	PRIMARY KEY(email));
+
+CREATE MATERIALIZED VIEW users_by_session_key
+	AS SELECT * FROM users_by_email
+	WHERE session_key IS NOT NULL AND email IS NOT NULL
+	PRIMARY KEY((session_key),email);
+
+
 
 CREATE TABLE posts_by_category(
 	user_id uuid,
@@ -31,6 +35,11 @@ CREATE TABLE posts_by_category(
 	images list<text>,
 	latlng varchar,
 	PRIMARY KEY((category), post_id)) WITH CLUSTERING ORDER BY (post_id DESC);
+
+CREATE MATERIALIZED VIEW posts_by_user_id AS SELECT * FROM posts_by_category
+	WHERE user_id IS NOT NULL AND post_id IS NOT NULL
+	PRIMARY KEY((user_id),post_id,category)
+	WITH CLUSTERING ORDER BY (post_id DESC);
 
 CREATE TABLE chats_by_id(
 	chat_id uuid,
