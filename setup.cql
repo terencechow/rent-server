@@ -17,8 +17,7 @@ CREATE TABLE users_by_email(
 	session_key text,
 	PRIMARY KEY(email));
 
-CREATE MATERIALIZED VIEW users_by_session_key
-	AS SELECT * FROM users_by_email
+CREATE MATERIALIZED VIEW users_by_session_key AS SELECT id, name, email, hash, latlng, session_key FROM users_by_email
 	WHERE session_key IS NOT NULL AND email IS NOT NULL
 	PRIMARY KEY((session_key),email);
 

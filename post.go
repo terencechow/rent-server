@@ -99,6 +99,8 @@ func ShowPost(ctx context.Context, w http.ResponseWriter, r *http.Request) {
 func EditOrCreatePost(ctx context.Context, w http.ResponseWriter, r *http.Request) {
 
 	user := requestUserFromContext(ctx)
+	fmt.Println("context user id", user.ID.String())
+	fmt.Println("xmux user id", xmux.Param(ctx, "user_id"))
 	if user.ID.String() != xmux.Param(ctx, "user_id") {
 		fmt.Println("Can't edit or create a post from a different user context")
 		http.Error(w, "Can't edit or create a post from a different user context", http.StatusInternalServerError)
@@ -127,7 +129,7 @@ func EditOrCreatePost(ctx context.Context, w http.ResponseWriter, r *http.Reques
 	// insert a post TTL 5184000 = 2 months in seconds
 	if err := session.Query(`INSERT INTO posts_by_category
 		(user_id, post_id, title, description, price, available, category, images, latlng)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?) USING TTL 5184000`,
+		VALUES (?,?, ?, ?, ?, ?, ?, ?, ?) USING TTL 5184000`,
 		user.ID, postID, title, description, price, available, category, images, latlng).Exec(); err != nil {
 		log.Fatal(err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)

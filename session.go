@@ -36,7 +36,7 @@ func requestUserFromContext(ctx context.Context) *User {
 func sessionMiddleware(next xhandler.HandlerC) xhandler.HandlerC {
 	return xhandler.HandlerFuncC(func(ctx context.Context, w http.ResponseWriter, r *http.Request) {
 
-		cookie, err := r.Cookie("RentSessionCookie")
+		cookie, err := r.Cookie(RentSessionCookie)
 
 		if err != nil || cookie.Value == "" {
 			// err is not nil when no cookie by that name could be found
@@ -54,7 +54,8 @@ func sessionMiddleware(next xhandler.HandlerC) xhandler.HandlerC {
 
 		var name, email, latlng string
 		var id gocql.UUID
-		if err := session.Query(`SELECT * FROM users_by_session_key WHERE session_key = ? LIMIT 1`,
+		fmt.Println("cookie value is", cookie.Value)
+		if err := session.Query(`SELECT id,name,email,latlng FROM users_by_session_key WHERE session_key = ? LIMIT 1`,
 			cookie.Value).Scan(&id, &name, &email, &latlng); err != nil {
 			fmt.Println("error getting user by session_key", err)
 			next.ServeHTTPC(ctx, w, r)
