@@ -22,9 +22,8 @@ import (
 
 // DeletePost Route to delete a post
 func DeletePost(ctx context.Context, w http.ResponseWriter, r *http.Request) {
-
 	user := requestUserFromContext(ctx)
-	if user.ID.String() != xmux.Param(ctx, "user_id") {
+	if user.ID.String() != xmux.Param(ctx, "user_id") && user.ID.String() != "" {
 		fmt.Println("Can't delete post from a different user context")
 		http.Error(w, "Can't delete post from a different user context", http.StatusInternalServerError)
 		return
@@ -99,9 +98,8 @@ func ShowPost(ctx context.Context, w http.ResponseWriter, r *http.Request) {
 func EditOrCreatePost(ctx context.Context, w http.ResponseWriter, r *http.Request) {
 
 	user := requestUserFromContext(ctx)
-	fmt.Println("context user id", user.ID.String())
-	fmt.Println("xmux user id", xmux.Param(ctx, "user_id"))
-	if user.ID.String() != xmux.Param(ctx, "user_id") {
+
+	if user.ID.String() != r.FormValue("user_id") && user.ID.String() != "" {
 		fmt.Println("Can't edit or create a post from a different user context")
 		http.Error(w, "Can't edit or create a post from a different user context", http.StatusInternalServerError)
 		return

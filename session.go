@@ -37,7 +37,6 @@ func sessionMiddleware(next xhandler.HandlerC) xhandler.HandlerC {
 	return xhandler.HandlerFuncC(func(ctx context.Context, w http.ResponseWriter, r *http.Request) {
 
 		cookie, err := r.Cookie(RentSessionCookie)
-
 		if err != nil || cookie.Value == "" {
 			// err is not nil when no cookie by that name could be found
 			next.ServeHTTPC(ctx, w, r)
@@ -66,7 +65,7 @@ func sessionMiddleware(next xhandler.HandlerC) xhandler.HandlerC {
 			Name:   name,
 			Email:  email,
 			Latlng: latlng}
-
+		fmt.Println("setting context to user", user)
 		ctx = newContextWithUser(ctx, &user)
 		next.ServeHTTPC(ctx, w, r)
 	})

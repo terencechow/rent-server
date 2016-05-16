@@ -21,14 +21,14 @@ func main() {
 	mux.GET("/", xhandler.HandlerFuncC(PostIndex))
 	mux.GET("/category/:category", xhandler.HandlerFuncC(PostIndex))
 	mux.GET("/category/:category/:post_id", xhandler.HandlerFuncC(ShowPost))
-	mux.POST("/user/:user_id/post", xhandler.HandlerFuncC(EditOrCreatePost))
-	mux.DELETE("/user/:user_id/category/:category/:post_id", xhandler.HandlerFuncC(DeletePost))
+	mux.POST("/user/post", xhandler.HandlerFuncC(EditOrCreatePost))
+	mux.DELETE("/user/:user_id/category/:category/post/:post_id", xhandler.HandlerFuncC(DeletePost))
 
 	/** Routes for Authentication **/
 	mux.POST("/register", xhandler.HandlerFuncC(CreateUser))
 	mux.POST("/login", xhandler.HandlerFuncC(LoginUser))
 	mux.POST("/logout", xhandler.HandlerFuncC(LogoutUser))
-	mux.DELETE("/user", xhandler.HandlerFuncC(DeleteUser))
+	mux.DELETE("/user/:user_id", xhandler.HandlerFuncC(DeleteUser))
 
 	if err := http.ListenAndServe(":8080", c.Handler(mux)); err != nil {
 		log.Fatal(err)

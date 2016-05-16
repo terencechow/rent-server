@@ -13,7 +13,7 @@ CREATE TABLE users_by_email(
 	name text,
 	email text,
 	hash text,
-	latlng varchar,
+	latlng text,
 	session_key text,
 	PRIMARY KEY(email));
 
@@ -32,7 +32,7 @@ CREATE TABLE posts_by_category(
 	available boolean,
 	category text,
 	images list<text>,
-	latlng varchar,
+	latlng text,
 	PRIMARY KEY((category), post_id)) WITH CLUSTERING ORDER BY (post_id DESC);
 
 CREATE MATERIALIZED VIEW posts_by_user_id AS SELECT * FROM posts_by_category
