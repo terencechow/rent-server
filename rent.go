@@ -2,36 +2,32 @@
 
 package main
 
-import (
-	"log"
-	"net/http"
-
-	"github.com/rs/xhandler"
-	"github.com/rs/xmux"
-)
+import "github.com/gin-gonic/gin"
 
 func main() {
 
-	c := xhandler.Chain{}
-	// Append a context-aware middleware handler
-	c.UseC(sessionMiddleware)
-	mux := xmux.New()
+	router := gin.New()
+	router.Use(gin.Logger())
+	router.Use(gin.Recovery())
 
 	/** Routes for Posts **/
-	mux.GET("/", xhandler.HandlerFuncC(PostIndex))
-	mux.GET("/category/:category", xhandler.HandlerFuncC(PostIndex))
-	mux.GET("/category/:category/:post_id", xhandler.HandlerFuncC(ShowPost))
-	mux.POST("/user/post", xhandler.HandlerFuncC(EditOrCreatePost))
-	mux.DELETE("/user/:user_id/category/:category/post/:post_id", xhandler.HandlerFuncC(DeletePost))
+	router.GET("/", PostIndex)
+	router.GET("/category/:category", PostIndex)
+	router.GET("/posts/:state/:post_id", ShowPost)
 
-	/** Routes for Authentication **/
-	mux.POST("/register", xhandler.HandlerFuncC(CreateUser))
-	mux.POST("/login", xhandler.HandlerFuncC(LoginUser))
-	mux.POST("/logout", xhandler.HandlerFuncC(LogoutUser))
-	mux.DELETE("/user/:user_id", xhandler.HandlerFuncC(DeleteUser))
+	authorized := router.Group("/")
+	authorized.Use(sessionMiddleware())
+	{
+		/** Authorized routes for Posts **/
+		authorized.POST("/user/post", EditOrCreatePost)
+		authorized.DELETE("/user/:user_id/category/:category/post/:state/:post_id", DeletePost)
+		/** Routes for Authentication **/
+		authorized.POST("/register", CreateUser)
+		authorized.POST("/login", LoginUser)
+		authorized.POST("/logout", LogoutUser)
+		authorized.DELETE("/user/:user_id", DeleteUser)
 
-	if err := http.ListenAndServe(":8080", c.Handler(mux)); err != nil {
-		log.Fatal(err)
 	}
+	router.Run(":8080")
 
 }

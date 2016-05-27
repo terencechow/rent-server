@@ -12,25 +12,26 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"net/http"
 	"strconv"
+	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/gocql/gocql"
-	"github.com/rs/xmux"
-	"golang.org/x/net/context"
 )
 
 // DeletePost Route to delete a post
-func DeletePost(ctx context.Context, w http.ResponseWriter, r *http.Request) {
-	user := requestUserFromContext(ctx)
-	if user.ID.String() != xmux.Param(ctx, "user_id") && user.ID.String() != "" {
+func DeletePost(c *gin.Context) {
+	user := requestUserFromContext(c)
+	if user.ID.String() != c.Param("user_id") && user.ID.String() != "" {
 		fmt.Println("Can't delete post from a different user context")
-		http.Error(w, "Can't delete post from a different user context", http.StatusInternalServerError)
+		c.JSON(500, gin.H{"error": "Can't delete post from a different user context"})
 		return
 	}
 
-	var postID = xmux.Param(ctx, "post_id")
-	var category = xmux.Param(ctx, "category")
+	var postID = c.Param("post_id")
+	var category = c.Param("category")
+	var state = c.Param("state")
+
 	// connect to the cluster
 	cluster := gocql.NewCluster("127.0.0.1")
 	cluster.Keyspace = ClusterKeyspace
@@ -38,25 +39,33 @@ func DeletePost(ctx context.Context, w http.ResponseWriter, r *http.Request) {
 	session, _ := cluster.CreateSession()
 	defer session.Close()
 
-	if err := session.Query(`DELETE FROM posts_by_category WHERE category = ? and post_id = ?`,
-		category, postID).Exec(); err != nil {
+	batch := gocql.NewBatch(gocql.LoggedBatch)
+	postsStatement := `DELETE FROM posts WHERE state = ? and post_id = ?`
+	postsCategoryStatement := `DELETE FROM posts_by_category
+		WHERE state = ? and category = ? and post_id = ?`
+	postsUserStatement := `DELETE FROM posts_by_user WHERE user_id = ? and post_id = ?`
+	batch.Query(postsStatement, state, postID)
+	batch.Query(postsCategoryStatement, state, category)
+	batch.Query(postsUserStatement, user.ID, postID)
+	if err := session.ExecuteBatch(batch); err != nil {
 		log.Fatal(err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
-	http.Redirect(w, r, "/", http.StatusFound)
+	c.Redirect(200, "/")
 }
 
 // ShowPost Route to show a post
-func ShowPost(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+func ShowPost(c *gin.Context) {
 
-	var postIDFromURL = xmux.Param(ctx, "post_id")
-	var category = xmux.Param(ctx, "category")
+	var postIDFromURL = c.Param("post_id")
+	var stateFromURL = c.Param("state")
 	var userID, postID gocql.UUID
-	var title, description, latlng string
-	var price int
-	var available bool
-	var images []string
+	var category, name, description, city, state string
+	var price, deposit, minimumRentalDays int
+	var nextAvailableDate string
+	var imageUrls []string
+	var latitude, longitude float64
 
 	// connect to the cluster
 	cluster := gocql.NewCluster("127.0.0.1")
@@ -66,53 +75,64 @@ func ShowPost(ctx context.Context, w http.ResponseWriter, r *http.Request) {
 	defer session.Close()
 
 	if err := session.Query(`SELECT
-   user_id, post_id, title, description, price, available, category, images, latlng
-   FROM posts_by_category WHERE category = ? and post_id = ? LIMIT 1`,
-		category, postIDFromURL).Scan(&userID, &postID, &title, &description, &price, &available, &category, &images, &latlng); err != nil {
-		// log.Fatal(err)
-		// http.Error(w, err.Error(), http.StatusInternalServerError)
+		user_id, post_id, category, name, description, price, deposit, minimum_rental_days,
+ 	 next_available_date, image_urls, city, state, latitude, longitude
+   FROM posts WHERE state = ? and post_id = ? LIMIT 1`,
+		stateFromURL, postIDFromURL).Scan(&userID, &postID, &category, &name, &description,
+		&price, &deposit, &minimumRentalDays, &nextAvailableDate, &imageUrls, &latitude, &longitude); err != nil {
 
-		http.Redirect(w, r, "/", http.StatusFound)
+		c.Redirect(200, "/")
 		return
 	}
 
+	shortForm, _ := time.Parse(nextAvailableDate, "2013-Feb-03")
 	post := Post{
-		UserID:      userID,
-		PostID:      postID,
-		Title:       title,
-		Description: description,
-		Price:       price,
-		Available:   available,
-		Category:    category,
-		Images:      images,
-		Latlng:      latlng}
+		UserID:            userID,
+		PostID:            postID,
+		Category:          category,
+		Name:              name,
+		Description:       description,
+		Price:             price,
+		Deposit:           deposit,
+		MinimumRentalDays: minimumRentalDays,
+		NextAvailableDate: shortForm,
+		ImageUrls:         imageUrls,
+		City:              city,
+		State:             state,
+		Latitude:          latitude,
+		Longitude:         longitude}
 
 	postJSON, _ := json.Marshal(post)
 
-	w.Header().Set("Content-Type", "application/json;charset=UTF-8")
-	w.WriteHeader(http.StatusOK)
-	w.Write(postJSON)
+	c.JSON(200, postJSON)
 }
 
 // EditOrCreatePost route to create or update a post
-func EditOrCreatePost(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+func EditOrCreatePost(c *gin.Context) {
 
-	user := requestUserFromContext(ctx)
+	user := requestUserFromContext(c)
 
-	if user.ID.String() != r.FormValue("user_id") && user.ID.String() != "" {
+	if user.ID.String() != c.PostForm("user_id") && user.ID.String() != "" {
 		fmt.Println("Can't edit or create a post from a different user context")
-		http.Error(w, "Can't edit or create a post from a different user context", http.StatusInternalServerError)
+		c.JSON(500, gin.H{"error": "Can't edit or create a post from a different user context"})
 		return
 	}
-	var title = r.FormValue("title")
-	var description = r.FormValue("description")
-	var category = r.FormValue("category")
-	var latlng = r.FormValue("latlng")
-	available, _ := strconv.ParseBool(r.FormValue("available"))
-	price, _ := strconv.Atoi(r.FormValue("price"))
-	var images []string
 
-	var postID = r.FormValue("post_id")
+	var postID = c.PostForm("post_id")
+	var category = c.PostForm("category")
+	var name = c.PostForm("name")
+	var description = c.PostForm("description")
+	price, _ := strconv.Atoi(c.PostForm("price"))
+	deposit, _ := strconv.Atoi(c.PostForm("deposit"))
+	minimumRentalDays, _ := strconv.Atoi(c.PostForm("minimumRentalDays"))
+	nextAvailableDate := c.PostForm("nextAvailableDate")
+	var city = c.PostForm("city")
+	var state = c.PostForm("state")
+	var latitude = c.PostForm("latitude")
+	var longitude = c.PostForm("longitude")
+
+	var imageUrls []string
+
 	if postID == "" {
 		postID = gocql.TimeUUID().String()
 	}
@@ -124,25 +144,45 @@ func EditOrCreatePost(ctx context.Context, w http.ResponseWriter, r *http.Reques
 	session, _ := cluster.CreateSession()
 	defer session.Close()
 
-	// insert a post TTL 5184000 = 2 months in seconds
-	if err := session.Query(`INSERT INTO posts_by_category
-		(user_id, post_id, title, description, price, available, category, images, latlng)
-		VALUES (?,?, ?, ?, ?, ?, ?, ?, ?) USING TTL 5184000`,
-		user.ID, postID, title, description, price, available, category, images, latlng).Exec(); err != nil {
+	batch := gocql.NewBatch(gocql.LoggedBatch)
+	postsStatement := `INSERT INTO posts
+		(user_id, post_id, category, name, description, price, deposit, minimum_rental_days,
+			next_available_date, image_urls, city, state, latitude, longitude)
+		VALUES (?,?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	postsCategoryStatement := `INSERT INTO posts_by_category
+		(user_id, post_id, category, name, description, price, deposit, minimum_rental_days,
+			next_available_date, image_urls, city, state, latitude, longitude)
+		VALUES (?,?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	postsUserStatement := `INSERT INTO posts_by_user
+		(user_id, post_id, category, name, description, price, deposit, minimum_rental_days,
+			next_available_date, image_urls, city, state, latitude, longitude)
+		VALUES (?,?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	batch.Query(postsStatement, user.ID, postID, category, name, description, price,
+		deposit, minimumRentalDays, nextAvailableDate, imageUrls, city, state,
+		latitude, longitude)
+	batch.Query(postsCategoryStatement, user.ID, postID, category, name, description, price,
+		deposit, minimumRentalDays, nextAvailableDate, imageUrls, city, state,
+		latitude, longitude)
+	batch.Query(postsUserStatement, user.ID, postID, category, name, description, price,
+		deposit, minimumRentalDays, nextAvailableDate, imageUrls, city, state,
+		latitude, longitude)
+	if err := session.ExecuteBatch(batch); err != nil {
 		log.Fatal(err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
-	http.Redirect(w, r, "/", http.StatusFound)
+	c.Redirect(200, "/")
 }
 
 //PostIndex route to show posts or a category of posts
-func PostIndex(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+func PostIndex(c *gin.Context) {
 	var userID, postID gocql.UUID
-	var title, description, category, latlng string
-	var price int
-	var available bool
-	var images []string
+	var category, name, description, city, state string
+	var price, deposit, minimumRentalDays int
+	var nextAvailableDate string
+	var imageUrls []string
+	var latitude, longitude float64
+
 	// connect to the cluster
 	cluster := gocql.NewCluster("127.0.0.1")
 	cluster.Keyspace = ClusterKeyspace
@@ -150,45 +190,76 @@ func PostIndex(ctx context.Context, w http.ResponseWriter, r *http.Request) {
 	session, _ := cluster.CreateSession()
 	defer session.Close()
 
-	var searchCategory = xmux.Param(ctx, "category")
+	searchCategory := c.Param("category")
+	userLatitude := c.Query("latitude")
+	userLongitude := c.Query("longitude")
 
 	var query *gocql.Query
 
 	if searchCategory == "" {
 		query = session.Query(`SELECT
-  		user_id, post_id, title, description, price, available, category, images, latlng
-  		FROM posts_by_category LIMIT 10`)
+			user_id, post_id, category, name, description, price, deposit, minimum_rental_days,
+			next_available_date, image_urls, city, state, latitude, longitude
+  		FROM posts WHERE expr(posts_index,'{
+				query:{
+					type: "geo_distance",
+					field: "place",
+					latitude: ?,
+					longitude: ?,
+					max_distance: "20km"
+				}
+			}') LIMIT 100`, userLatitude, userLongitude)
 	} else {
 		query = session.Query(`SELECT
-      user_id, post_id, title, description, price, available, category, images, latlng
-      FROM posts_by_category WHERE category = ? LIMIT 10`, searchCategory)
+			user_id, post_id, category, name, description, price, deposit, minimum_rental_days,
+			next_available_date, image_urls, city, state, latitude, longitude
+  		FROM posts_by_category WHERE expr(posts_category_index,'{
+				filter: {
+					type: "match",
+					field: "category",
+					value: ? },
+				query:{
+					type: "geo_distance",
+					field: "place",
+					latitude: ?,
+					longitude: ?,
+					max_distance: "20km"
+				}
+			}') LIMIT 100`, searchCategory, userLatitude, userLongitude)
 	}
 
 	iter := query.Iter()
 
 	var posts []Post
 
-	for iter.Scan(&userID, &postID, &title, &description, &price, &available, &category, &images, &latlng) {
+	for iter.Scan(&userID, &postID, &category, &name, &description, &price, &deposit,
+		&minimumRentalDays, &nextAvailableDate, &imageUrls, &city, &state,
+		&latitude, &longitude) {
+
+		shortForm, _ := time.Parse(nextAvailableDate, "2013-Feb-03")
 		post := Post{
-			UserID:      userID,
-			PostID:      postID,
-			Title:       title,
-			Description: description,
-			Price:       price,
-			Available:   available,
-			Category:    category,
-			Images:      images,
-			Latlng:      latlng}
+			UserID:            userID,
+			PostID:            postID,
+			Category:          category,
+			Name:              name,
+			Description:       description,
+			Price:             price,
+			Deposit:           deposit,
+			MinimumRentalDays: minimumRentalDays,
+			NextAvailableDate: shortForm,
+			ImageUrls:         imageUrls,
+			City:              city,
+			State:             state,
+			Latitude:          latitude,
+			Longitude:         longitude}
 		posts = append(posts, post)
 	}
 	postsJSON, _ := json.Marshal(posts)
 
 	if err := iter.Close(); err != nil {
 		log.Fatal(err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		c.JSON(500, gin.H{"error": err.Error()})
 		return
 	}
-	w.Header().Set("Content-Type", "application/json;charset=UTF-8")
-	w.WriteHeader(http.StatusOK)
-	w.Write(postsJSON)
+	c.JSON(200, postsJSON)
 }

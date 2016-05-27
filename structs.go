@@ -1,18 +1,27 @@
 package main
 
-import "github.com/gocql/gocql"
+import (
+	"time"
+
+	"github.com/gocql/gocql"
+)
 
 // Post json structure
 type Post struct {
-	UserID      gocql.UUID `json:"userID"`
-	PostID      gocql.UUID `json:"postID"`
-	Title       string     `json:"title"`
-	Description string     `json:"description"`
-	Price       int        `json:"price"`
-	Available   bool       `json:"available"`
-	Category    string     `json:"category"`
-	Images      []string   `json:"images"`
-	Latlng      string     `json:"latlng"`
+	UserID            gocql.UUID `json:"userID"`
+	PostID            gocql.UUID `json:"postID"`
+	Category          string     `json:"category"`
+	Name              string     `json:"name"`
+	Description       string     `json:"description"`
+	Price             int        `json:"price"`
+	Deposit           int        `json:"deposit"`
+	MinimumRentalDays int        `json:"minimumRentalDays"`
+	NextAvailableDate time.Time  `json:"nextAvailableDate"`
+	ImageUrls         []string   `json:"imageUrls"`
+	City              string     `json:"city"`
+	State             string     `json:"state"`
+	Latitude          float64    `json:"latitude"`
+	Longitude         float64    `json:"longitude"`
 }
 
 // User json structure

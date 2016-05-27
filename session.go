@@ -7,12 +7,13 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
-	"net/http"
 
+	"github.com/gin-gonic/gin"
 	"github.com/gocql/gocql"
-	"github.com/rs/xhandler"
-	"golang.org/x/net/context"
 )
+
+// ClusterKeyspace - name of keyspace
+const ClusterKeyspace string = "rent"
 
 // RentSessionCookie is the constant string name used in cookies
 const RentSessionCookie string = "RENT_SESSION_ID"
@@ -21,25 +22,21 @@ type key int
 
 const userIDKey key = 0
 
-func newContextWithUser(ctx context.Context, user *User) context.Context {
-	return context.WithValue(ctx, userIDKey, user)
-}
-
-func requestUserFromContext(ctx context.Context) *User {
-	user := ctx.Value(userIDKey)
+func requestUserFromContext(c *gin.Context) *User {
+	user, _ := c.Get("user")
 	if user != nil {
 		return user.(*User)
 	}
 	return &User{}
 }
 
-func sessionMiddleware(next xhandler.HandlerC) xhandler.HandlerC {
-	return xhandler.HandlerFuncC(func(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+func sessionMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
 
-		cookie, err := r.Cookie(RentSessionCookie)
-		if err != nil || cookie.Value == "" {
-			// err is not nil when no cookie by that name could be found
-			next.ServeHTTPC(ctx, w, r)
+		cookie, err := c.Cookie(RentSessionCookie)
+		if err != nil || cookie == "" {
+			// err is not nil then no cookie by that name could be found
+			c.Next()
 			return
 		}
 
@@ -51,25 +48,23 @@ func sessionMiddleware(next xhandler.HandlerC) xhandler.HandlerC {
 		session, _ := cluster.CreateSession()
 		defer session.Close()
 
-		var name, email, latlng string
+		var name, email string
 		var id gocql.UUID
-		fmt.Println("cookie value is", cookie.Value)
-		if err := session.Query(`SELECT id,name,email,latlng FROM users_by_session_key WHERE session_key = ? LIMIT 1`,
-			cookie.Value).Scan(&id, &name, &email, &latlng); err != nil {
+		fmt.Println("cookie value is", cookie)
+		if err := session.Query(`SELECT id,name,email FROM users_by_session_key WHERE session_key = ? LIMIT 1`,
+			cookie).Scan(&id, &name, &email); err != nil {
 			fmt.Println("error getting user by session_key", err)
-			next.ServeHTTPC(ctx, w, r)
+			c.Next()
 			return
 		}
 		user := User{
-			ID:     id,
-			Name:   name,
-			Email:  email,
-			Latlng: latlng}
+			ID:    id,
+			Name:  name,
+			Email: email}
 		fmt.Println("setting context to user", user)
-		ctx = newContextWithUser(ctx, &user)
-		next.ServeHTTPC(ctx, w, r)
-	})
-
+		c.Set("user", user)
+		c.Next()
+	}
 }
 
 func generateSessionID() (string, error) {

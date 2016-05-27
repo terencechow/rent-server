@@ -8,51 +8,136 @@ CREATE KEYSPACE rent WITH REPLICATION = { 'class' : 'SimpleStrategy', 'replicati
 
 USE rent;
 
+CREATE TABLE users(
+	id uuid,
+	name text,
+	email text,
+	hash text,
+	session_key text,
+	PRIMARY KEY(id));
+
 CREATE TABLE users_by_email(
 	id uuid,
 	name text,
 	email text,
 	hash text,
-	latlng text,
 	session_key text,
 	PRIMARY KEY(email));
 
-CREATE MATERIALIZED VIEW users_by_session_key AS SELECT id, name, email, hash, latlng, session_key FROM users_by_email
-	WHERE session_key IS NOT NULL AND email IS NOT NULL
-	PRIMARY KEY((session_key),email);
+CREATE TABLE users_by_session_key(
+	id uuid,
+	name text,
+	email text,
+	hash text,
+	session_key text,
+	PRIMARY KEY(session_key));
 
-
+CREATE TABLE posts(
+	user_id uuid,
+	post_id uuid,
+	category text,
+	name text,
+	description text,
+	price int,
+	deposit int,
+	minimum_rental_days int,
+	next_available_date timestamp,
+	image_urls set<text>,
+	city text,
+	state text,
+	latitude float,
+	longitude float,
+	PRIMARY KEY((state, post_id), next_available_date)) WITH CLUSTERING ORDER BY (next_available_date DESC);
 
 CREATE TABLE posts_by_category(
 	user_id uuid,
-	post_id timeuuid,
-	title text,
+	post_id uuid,
+	category text,
+	name text,
 	description text,
 	price int,
-	available boolean,
+	deposit int,
+	minimum_rental_days int,
+	next_available_date timestamp,
+	image_urls set<text>,
+	city text,
+	state text,
+	latitude float,
+	longitude float,
+	PRIMARY KEY((state, category), next_available_date, post_id)) WITH CLUSTERING ORDER BY (next_available_date DESC);
+
+CREATE TABLE posts_by_user(
+	user_id uuid,
+	post_id uuid,
 	category text,
-	images list<text>,
-	latlng text,
-	PRIMARY KEY((category), post_id)) WITH CLUSTERING ORDER BY (post_id DESC);
+	name text,
+	description text,
+	price int,
+	deposit int,
+	minimum_rental_days int,
+	next_available_date timestamp,
+	image_urls set<text>,
+	city text,
+	state text,
+	latitude float,
+	longitude float,
+	PRIMARY KEY((user_id), next_available_date, post_id)) WITH CLUSTERING ORDER BY (next_available_date DESC);
 
-CREATE MATERIALIZED VIEW posts_by_user_id AS SELECT * FROM posts_by_category
-	WHERE user_id IS NOT NULL AND post_id IS NOT NULL
-	PRIMARY KEY((user_id),post_id,category)
-	WITH CLUSTERING ORDER BY (post_id DESC);
-
-CREATE TABLE chats_by_id(
+CREATE TABLE chats(
 	chat_id uuid,
-	post_id timeuuid,
-	post_title text,
-	post_main_image text,
-	sender_name text,
-	recipient_name text,
-	last_update timeuuid,
-	PRIMARY KEY((chat_id),last_update)) WITH CLUSTERING ORDER BY (last_update DESC);
+	post_id uuid,
+	user_id uuid,
+	post_name text,
+	main_image_url text,
+	last_message_time timestamp,
+	PRIMARY KEY((chat_id, user_id), last_message_time) WITH CLUSTERING ORDER BY (last_message_time DESC);
 
-CREATE TABLE messages_by_chat_id(
+CREATE TABLE messages_by_chat(
 	chat_id uuid,
-	message_id timeuuid,
-	sender_name text,
+	message_time timestamp,
+	message_id uuid,
+	s post_id uuid,
+	s post_name text,
+	s owner_id uuid,
+	s owner_name text,
+	s borrower_id uuid,
+	s borrower_name text,
+	s main_image_url text,
 	message_content text,
-	PRIMARY KEY((chat_id), message_id)) WITH CLUSTERING ORDER BY (message_id DESC);
+	message_sender_id uuid,
+	PRIMARY KEY((chat_id), message_time, message_id) WITH CLUSTERING ORDER BY (message_time DESC);
+
+CREATE CUSTOM INDEX posts_index ON posts ()
+USING 'com.stratio.cassandra.lucene.Index'
+WITH OPTIONS = {
+    'refresh_seconds' : '60',
+    'schema' : '{
+        fields : {
+            name  							: {type : "text", analyzer : "english"},
+						description  				: {type : "text", analyzer : "english"},
+						price		  					: {type : "integer"},
+						deposit					  	: {type : "integer"},
+						minimum_rental_days : {type : "integer"},
+            next_available_date : {type : "date", pattern : "yyyy/MM/dd"},
+						place 							: {type : "geo_point", latitude: "latitude", longitude: "longitude"}
+        }
+    }'
+};
+
+CREATE CUSTOM INDEX posts_category_index ON posts_by_category ()
+USING 'com.stratio.cassandra.lucene.Index'
+WITH OPTIONS = {
+    'refresh_seconds' : '60',
+    'schema' : '{
+        fields : {
+            category  					: {type : "string"},
+            name  							: {type : "text", analyzer : "english"},
+						description  				: {type : "text", analyzer : "english"},
+						price		  					: {type : "integer"},
+						deposit					  	: {type : "integer"},
+						minimum_rental_days : {type : "integer"},
+            next_available_date : {type : "date", pattern : "yyyy/MM/dd"},
+						place 							: {type : "geo_point", latitude: "latitude", longitude: "longitude"}
+        }
+    }'
+};
