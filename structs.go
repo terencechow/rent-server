@@ -29,6 +29,5 @@ type User struct {
 	ID         gocql.UUID `json:"id"`
 	Name       string     `json:"name"`
 	Email      string     `json:"email"`
-	Latlng     string     `json:"latlng"`
 	SessionKey string     `json:"session_key"`
 }

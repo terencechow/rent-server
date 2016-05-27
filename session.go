@@ -58,9 +58,10 @@ func sessionMiddleware() gin.HandlerFunc {
 			return
 		}
 		user := User{
-			ID:    id,
-			Name:  name,
-			Email: email}
+			ID:         id,
+			Name:       name,
+			Email:      email,
+			SessionKey: cookie}
 		fmt.Println("setting context to user", user)
 		c.Set("user", user)
 		c.Next()
