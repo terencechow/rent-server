@@ -63,7 +63,7 @@ func sessionMiddleware() gin.HandlerFunc {
 			Email:      email,
 			SessionKey: cookie}
 		fmt.Println("setting context to user", user)
-		c.Set("user", user)
+		c.Set("user", &user)
 		c.Next()
 	}
 }

@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 	"strconv"
 	"time"
 
@@ -24,7 +25,7 @@ func DeletePost(c *gin.Context) {
 	user := requestUserFromContext(c)
 	if user.ID.String() != c.Param("user_id") && user.ID.String() != "" {
 		fmt.Println("Can't delete post from a different user context")
-		c.JSON(500, gin.H{"error": "Can't delete post from a different user context"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Can't delete post from a different user context"})
 		return
 	}
 
@@ -49,10 +50,10 @@ func DeletePost(c *gin.Context) {
 	batch.Query(postsUserStatement, user.ID, postID)
 	if err := session.ExecuteBatch(batch); err != nil {
 		log.Fatal(err)
-		c.JSON(500, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.Redirect(200, "/")
+	c.Redirect(http.StatusFound, "/")
 }
 
 // ShowPost Route to show a post
@@ -81,7 +82,7 @@ func ShowPost(c *gin.Context) {
 		stateFromURL, postIDFromURL).Scan(&userID, &postID, &category, &name, &description,
 		&price, &deposit, &minimumRentalDays, &nextAvailableDate, &imageUrls, &latitude, &longitude); err != nil {
 
-		c.Redirect(200, "/")
+		c.Redirect(http.StatusFound, "/")
 		return
 	}
 
@@ -104,7 +105,7 @@ func ShowPost(c *gin.Context) {
 
 	postJSON, _ := json.Marshal(post)
 
-	c.JSON(200, postJSON)
+	c.JSON(http.StatusOK, postJSON)
 }
 
 // EditOrCreatePost route to create or update a post
@@ -114,7 +115,7 @@ func EditOrCreatePost(c *gin.Context) {
 
 	if user.ID.String() != c.PostForm("user_id") && user.ID.String() != "" {
 		fmt.Println("Can't edit or create a post from a different user context")
-		c.JSON(500, gin.H{"error": "Can't edit or create a post from a different user context"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Can't edit or create a post from a different user context"})
 		return
 	}
 
@@ -168,14 +169,15 @@ func EditOrCreatePost(c *gin.Context) {
 		latitude, longitude)
 	if err := session.ExecuteBatch(batch); err != nil {
 		log.Fatal(err)
-		c.JSON(500, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.Redirect(200, "/")
+	c.Redirect(http.StatusFound, "/")
 }
 
 //PostIndex route to show posts or a category of posts
 func PostIndex(c *gin.Context) {
+
 	var userID, postID gocql.UUID
 	var category, name, description, city, state string
 	var price, deposit, minimumRentalDays int
@@ -258,8 +260,8 @@ func PostIndex(c *gin.Context) {
 
 	if err := iter.Close(); err != nil {
 		log.Fatal(err)
-		c.JSON(500, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(200, postsJSON)
+	c.JSON(http.StatusOK, postsJSON)
 }

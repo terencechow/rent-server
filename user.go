@@ -9,6 +9,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 
 	"github.com/gebi/scryptauth"
@@ -25,7 +26,7 @@ func DeleteUser(c *gin.Context) {
 
 	if user.ID.String() != c.Param("user_id") {
 		fmt.Println("Can't delete user from a different user context")
-		c.JSON(500, gin.H{"error": "Can't delete user from a different user context"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Can't delete user from a different user context"})
 		return
 	}
 
@@ -53,32 +54,30 @@ func DeleteUser(c *gin.Context) {
 	batch := gocql.NewBatch(gocql.LoggedBatch)
 	usersStatement := `DELETE FROM users WHERE id = ?`
 	usersEmailStatement := `DELETE FROM users_by_email WHERE email = ?`
-	usersSessionStatement := `DELETE FROM users_by_session_key WHERE session_key = ?`
 	batch.Query(usersStatement, user.ID)
 	batch.Query(usersEmailStatement, user.Email)
-	batch.Query(usersSessionStatement, user.SessionKey)
 	if err := session.ExecuteBatch(batch); err != nil {
 		log.Fatal(err)
-		c.JSON(500, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
 	//delete user posts
 
 	// name, value, maxAge, path, domain, secure, httpOnly
-	c.SetCookie(RentSessionCookie, "", -1, "", "localhost", true, true)
-	c.Redirect(200, "/")
+	c.SetCookie(RentSessionCookie, "", -1, "", "192.168.2.229", true, true)
+	c.Redirect(http.StatusFound, "/")
 }
 
-//LogoutUser route to log out user
+// LogoutUser route
+// requires a post with users email
 func LogoutUser(c *gin.Context) {
-	fmt.Println("LogoutUser route")
 	// check the user logging out matches user's session key
 	user := requestUserFromContext(c)
 
 	if user.Email != c.PostForm("email") && user.Email != "" {
 		fmt.Println("Can't logout user from a different user context")
-		c.JSON(500, gin.H{"error": "Can't logout user from a different user context"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Can't logout user from a different user context"})
 		return
 	}
 
@@ -92,23 +91,22 @@ func LogoutUser(c *gin.Context) {
 	batch := gocql.NewBatch(gocql.LoggedBatch)
 	usersStatement := `DELETE session_key FROM users WHERE id = ?`
 	usersEmailStatement := `DELETE session_key FROM users_by_email WHERE email = ?`
-	usersSessionStatement := `DELETE session_key FROM users_by_session_key WHERE session_key = ?`
 	batch.Query(usersStatement, user.ID)
 	batch.Query(usersEmailStatement, user.Email)
-	batch.Query(usersSessionStatement, user.SessionKey)
 	if err := session.ExecuteBatch(batch); err != nil {
 		log.Fatal(err)
-		c.JSON(500, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
 	// name, value, maxAge, path, domain, secure, httpOnly
-	c.SetCookie(RentSessionCookie, "", -1, "", "localhost", true, true)
+	c.SetCookie(RentSessionCookie, "", -1, "", "192.168.2.229", true, true)
 
-	c.Redirect(200, "/")
+	c.Redirect(http.StatusFound, "/")
 }
 
-//LoginUser route to login a user
+// LoginUser route
+// requires a postform with the email and password
 func LoginUser(c *gin.Context) {
 
 	var email = c.PostForm("email")
@@ -119,7 +117,7 @@ func LoginUser(c *gin.Context) {
 		fmt.Println("User is logged in by sessionKey", user.Email)
 
 		//redirect to index //TODO: redirect to the path the user was going to
-		c.Redirect(200, "/")
+		c.Redirect(http.StatusFound, "/")
 		return
 	}
 
@@ -135,13 +133,14 @@ func LoginUser(c *gin.Context) {
 	//get database hash and user name, by the email
 	var databaseHash string
 	var previousSessionKey string
+	var userID string
 
-	if err := session.Query(`SELECT hash, session_key FROM users_by_email WHERE email = ? LIMIT 1`,
-		email).Scan(&databaseHash, &previousSessionKey); err != nil {
+	if err := session.Query(`SELECT id, hash, session_key FROM users_by_email WHERE email = ? LIMIT 1`,
+		email).Scan(&userID, &databaseHash, &previousSessionKey); err != nil {
 		fmt.Println(err)
 		log.Fatal(err)
 		//TODO: show no user exists by that email if that is the error
-		c.JSON(500, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -151,7 +150,7 @@ func LoginUser(c *gin.Context) {
 	if err != nil {
 		fmt.Println(err)
 		log.Fatal(err)
-		c.JSON(500, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -160,7 +159,7 @@ func LoginUser(c *gin.Context) {
 	if err != nil {
 		fmt.Print(err)
 		log.Fatal(err)
-		c.JSON(500, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -169,7 +168,7 @@ func LoginUser(c *gin.Context) {
 	ok, err := pwHash.Check(pwCost, hash, []byte(pass), salt)
 	if !ok {
 		fmt.Printf("Error wrong password for user (%s)", err)
-		c.JSON(500, gin.H{"error": "Error wrong password for user"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error wrong password for user"})
 		return
 	}
 	fmt.Println("Login OK")
@@ -178,33 +177,76 @@ func LoginUser(c *gin.Context) {
 	sessionKey, err := generateSessionID()
 	if err != nil {
 		log.Fatal(err)
-		c.JSON(500, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
 	batch := gocql.NewBatch(gocql.LoggedBatch)
 
-	usersStatement := `INSERT INTO users (session_key) VALUES (?) WHERE id = ?`
-	usersEmailStatement := `INSERT INTO users_by_email (session_key) VALUES (?) WHERE email = ?`
-	usersSessionStatement := `INSERT INTO users_by_session_key (session_key) VALUES (?)
-	 WHERE session_key = ?`
-	batch.Query(usersStatement, sessionKey, user.ID)
+	usersStatement := `INSERT INTO users (session_key, id) VALUES (?, ?)`
+	usersEmailStatement := `INSERT INTO users_by_email (session_key, email) VALUES (?, ?)`
+	batch.Query(usersStatement, sessionKey, userID)
 	batch.Query(usersEmailStatement, sessionKey, email)
-	batch.Query(usersSessionStatement, sessionKey, previousSessionKey)
 	if err := session.ExecuteBatch(batch); err != nil {
 		log.Fatal(err)
-		c.JSON(500, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
 	// name, value, maxAge, path, domain, secure, httpOnly
-	c.SetCookie(RentSessionCookie, sessionKey, 0, "", "localhost", true, true)
+	c.SetCookie(RentSessionCookie, sessionKey, 0, "", "192.168.2.229", true, true)
 
 	//redirect to index //TODO: redirect to the path the user was going to
-	c.Redirect(200, "/")
+	c.Redirect(http.StatusFound, "/")
 }
 
-//CreateUser is the route to create a user.
+// EditUser route
+// requires a post form with the same email as the logged in context
+// requires a name to update the profile name to
+func EditUser(c *gin.Context) {
+
+	user := requestUserFromContext(c)
+	fmt.Println("edit user", user)
+
+	// if we alreay have a user from context, it means we have a valid session_key,
+	if user.Email != c.PostForm("email") || user.Email == "" {
+		fmt.Println("Can't edit user from logged out context or differnt user context", user.Email)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Can't edit user from logged out context or differnt user context"})
+		return
+	}
+	name := c.PostForm("name")
+	if name == "" {
+		fmt.Println("Can't edit user name to be empty", user.Email)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Can't edit user name to be empty"})
+		return
+	}
+
+	// connect to the cluster
+	cluster := gocql.NewCluster("127.0.0.1")
+	cluster.Keyspace = ClusterKeyspace
+	cluster.ProtoVersion = 4
+	session, _ := cluster.CreateSession()
+	defer session.Close()
+
+	usersEmailStatement := `INSERT INTO users_by_email (name, email) VALUES (?, ?)`
+	usersStatement := `INSERT INTO users (name, id) VALUES (?, ?)`
+	if err := session.Query(usersEmailStatement, name, user.Email).Exec(); err != nil {
+		log.Fatal(err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
+		return
+	}
+	if err := session.Query(usersStatement, name, user.ID).Exec(); err != nil {
+		log.Fatal(err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
+		return
+	}
+
+	//redirect to index //TODO: redirect to the path the user was going to
+	c.Redirect(http.StatusFound, "/")
+}
+
+// CreateUser route
+// requires a postform with a name, password and email
 func CreateUser(c *gin.Context) {
 
 	// check the user logging out matches user's session key
@@ -213,7 +255,7 @@ func CreateUser(c *gin.Context) {
 	fmt.Println(user.Email)
 	if user.Email != "" {
 		fmt.Println("Can't Create User from a logged in context")
-		c.JSON(500, gin.H{"error": "Can't Create User from a logged in context"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Can't Create User from a logged in context"})
 		return
 	}
 
@@ -223,13 +265,13 @@ func CreateUser(c *gin.Context) {
 	if err != nil {
 		fmt.Println(err)
 		log.Fatal(err)
-		c.JSON(500, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
 	if c.PostForm("pass") == "" {
 		fmt.Println("Password is empty!")
-		c.JSON(500, gin.H{"error": "Password is Empty!"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Password is Empty!"})
 		return
 	}
 	// generate a hash and salt from the scrypauth
@@ -237,7 +279,7 @@ func CreateUser(c *gin.Context) {
 	if err != nil {
 		fmt.Println(err)
 		log.Fatal(err)
-		c.JSON(500, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -255,45 +297,46 @@ func CreateUser(c *gin.Context) {
 	if err != nil {
 		fmt.Println(err)
 		log.Fatal(err)
-		c.JSON(500, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	uuid, err := gocql.RandomUUID()
 	if err != nil {
 		fmt.Println(err)
 		log.Fatal(err)
-		c.JSON(500, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	batch := gocql.NewBatch(gocql.LoggedBatch)
 
-	usersStatement := `INSERT INTO users (id, name, email, hash, session_key) VALUES
-	(?, ?, ?, ?, ?) IF NOT EXISTS`
 	usersEmailStatement := `INSERT INTO users_by_email (id, name, email, hash, session_key)
-	VALUES (?, ?, ?, ?, ?) IF NOT EXISTS`
-	usersSessionStatement := `INSERT INTO users_by_session_key (id, name, email, hash, session_key)
 	VALUES (?, ?, ?, ?, ?) IF NOT EXISTS`
 	name := c.PostForm("name")
 	email := c.PostForm("email")
-	batch.Query(usersStatement, uuid, name, email, hashBase64, sessionKey)
-	batch.Query(usersEmailStatement, uuid, name, email, hashBase64, sessionKey)
-	batch.Query(usersSessionStatement, uuid, name, email, hashBase64, sessionKey)
 
-	var nameCAS, emailCAS, hashCAS, sessionKeyCAS string
-	var uuidCAS gocql.UUID
+	var uuidCAS, nameCAS, emailCAS, hashCAS, sessionKeyCAS string
 
-	if applied, _, err := session.ExecuteBatchCAS(batch, &nameCAS, &emailCAS, &hashCAS, &uuidCAS, &sessionKeyCAS); err != nil {
+	if applied, err :=
+		session.Query(usersEmailStatement, uuid, name, email, hashBase64, sessionKey).
+			ScanCAS(&nameCAS, &emailCAS, &hashCAS, &uuidCAS, &sessionKeyCAS); err != nil {
 		log.Fatal(err)
-		c.JSON(500, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	} else if !applied {
-		fmt.Println("Could not create user because email already exists")
-		c.JSON(500, gin.H{"error": "Could not create user because email already exists"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not create user because email already exists"})
+		return
+	}
+
+	usersStatement := `INSERT INTO users (id, name, email, hash, session_key) VALUES
+	(?, ?, ?, ?, ?)`
+
+	if err := session.Query(usersStatement, uuid, name, email, hashBase64, sessionKey).Exec(); err != nil {
+		log.Fatal(err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err})
 		return
 	}
 
 	// name, value, maxAge, path, domain, secure, httpOnly
-	c.SetCookie(RentSessionCookie, sessionKey, 0, "", "localhost", true, true)
+	c.SetCookie(RentSessionCookie, sessionKey, 0, "", "192.168.2.229", true, true)
 
-	c.Redirect(200, "/")
+	c.Redirect(http.StatusFound, "/")
 }

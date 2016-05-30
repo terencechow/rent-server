@@ -23,6 +23,7 @@ func main() {
 		authorized.DELETE("/user/:user_id/category/:category/post/:state/:post_id", DeletePost)
 		/** Routes for Authentication **/
 		authorized.POST("/register", CreateUser)
+		authorized.POST("/edit", EditUser)
 		authorized.POST("/login", LoginUser)
 		authorized.POST("/logout", LogoutUser)
 		authorized.DELETE("/user/:user_id", DeleteUser)

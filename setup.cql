@@ -24,13 +24,10 @@ CREATE TABLE users_by_email(
 	session_key text,
 	PRIMARY KEY(email));
 
-CREATE TABLE users_by_session_key(
-	id uuid,
-	name text,
-	email text,
-	hash text,
-	session_key text,
-	PRIMARY KEY(session_key));
+CREATE MATERIALIZED VIEW users_by_session_key AS SELECT 
+	id, name, email, hash, session_key FROM users
+	WHERE id IS NOT NULL AND session_key IS NOT NULL
+	PRIMARY KEY (session_key, id);
 
 CREATE TABLE posts(
 	user_id uuid,
@@ -90,22 +87,22 @@ CREATE TABLE chats(
 	post_name text,
 	main_image_url text,
 	last_message_time timestamp,
-	PRIMARY KEY((chat_id, user_id), last_message_time) WITH CLUSTERING ORDER BY (last_message_time DESC);
+	PRIMARY KEY((chat_id, user_id), last_message_time)) WITH CLUSTERING ORDER BY (last_message_time DESC);
 
 CREATE TABLE messages_by_chat(
 	chat_id uuid,
 	message_time timestamp,
 	message_id uuid,
-	s post_id uuid,
-	s post_name text,
-	s owner_id uuid,
-	s owner_name text,
-	s borrower_id uuid,
-	s borrower_name text,
-	s main_image_url text,
+	post_id uuid STATIC,
+	post_name text STATIC,
+	owner_id uuid STATIC,
+	owner_name text STATIC,
+	borrower_id uuid STATIC,
+	borrower_name text STATIC,
+	main_image_url text STATIC,
 	message_content text,
 	message_sender_id uuid,
-	PRIMARY KEY((chat_id), message_time, message_id) WITH CLUSTERING ORDER BY (message_time DESC);
+	PRIMARY KEY((chat_id), message_time, message_id)) WITH CLUSTERING ORDER BY (message_time DESC);
 
 CREATE CUSTOM INDEX posts_index ON posts ()
 USING 'com.stratio.cassandra.lucene.Index'
