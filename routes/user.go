@@ -33,7 +33,7 @@ func DeleteUser(c *gin.Context) {
 	}
 
 	// connect to the cluster
-	cluster := gocql.NewCluster("127.0.0.1")
+	cluster := gocql.NewCluster(constants.IPAddress)
 	cluster.Keyspace = constants.ClusterKeyspace
 	cluster.ProtoVersion = 4
 	session, _ := cluster.CreateSession()
@@ -67,7 +67,7 @@ func DeleteUser(c *gin.Context) {
 	//delete user posts
 
 	// name, value, maxAge, path, domain, secure, httpOnly
-	c.SetCookie(constants.RentSessionCookie, "", -1, "", "192.168.2.229", true, true)
+	c.SetCookie(constants.RentSessionCookie, "", -1, "", "", true, true)
 	c.Redirect(http.StatusSeeOther, "/")
 }
 
@@ -84,7 +84,7 @@ func LogoutUser(c *gin.Context) {
 	}
 
 	// connect to the cluster
-	cluster := gocql.NewCluster("127.0.0.1")
+	cluster := gocql.NewCluster(constants.IPAddress)
 	cluster.Keyspace = constants.ClusterKeyspace
 	cluster.ProtoVersion = 4
 	session, _ := cluster.CreateSession()
@@ -102,7 +102,7 @@ func LogoutUser(c *gin.Context) {
 	}
 
 	// name, value, maxAge, path, domain, secure, httpOnly
-	c.SetCookie(constants.RentSessionCookie, "", -1, "", "192.168.2.229", true, true)
+	c.SetCookie(constants.RentSessionCookie, "", -1, "", "", true, true)
 
 	c.Redirect(http.StatusSeeOther, "/")
 }
@@ -126,7 +126,7 @@ func LoginUser(c *gin.Context) {
 	//no user in session, need to login user
 
 	// connect to the cluster
-	cluster := gocql.NewCluster("127.0.0.1")
+	cluster := gocql.NewCluster(constants.IPAddress)
 	cluster.Keyspace = constants.ClusterKeyspace
 	cluster.ProtoVersion = 4
 	session, _ := cluster.CreateSession()
@@ -196,7 +196,7 @@ func LoginUser(c *gin.Context) {
 	}
 
 	// name, value, maxAge, path, domain, secure, httpOnly
-	c.SetCookie(constants.RentSessionCookie, sessionKey, 0, "", "192.168.2.229", true, true)
+	c.SetCookie(constants.RentSessionCookie, sessionKey, 0, "", "", true, true)
 
 	//redirect to index //TODO: redirect to the path the user was going to
 	c.Redirect(http.StatusSeeOther, "/")
@@ -224,7 +224,7 @@ func EditUser(c *gin.Context) {
 	}
 
 	// connect to the cluster
-	cluster := gocql.NewCluster("127.0.0.1")
+	cluster := gocql.NewCluster(constants.IPAddress)
 	cluster.Keyspace = constants.ClusterKeyspace
 	cluster.ProtoVersion = 4
 	session, _ := cluster.CreateSession()
@@ -289,7 +289,7 @@ func CreateUser(c *gin.Context) {
 	hashBase64 := scryptauth.EncodeBase64(pwHash.PwCost, hash, salt)
 
 	// connect to the cluster
-	cluster := gocql.NewCluster("127.0.0.1")
+	cluster := gocql.NewCluster(constants.IPAddress)
 	cluster.Keyspace = constants.ClusterKeyspace
 	cluster.ProtoVersion = 4
 	session, _ := cluster.CreateSession()
@@ -338,7 +338,7 @@ func CreateUser(c *gin.Context) {
 	}
 
 	// name, value, maxAge, path, domain, secure, httpOnly
-	c.SetCookie(constants.RentSessionCookie, sessionKey, 0, "", "192.168.2.229", true, true)
+	c.SetCookie(constants.RentSessionCookie, sessionKey, 0, "", "", true, true)
 
 	c.Redirect(http.StatusSeeOther, "/")
 }

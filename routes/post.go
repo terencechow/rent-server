@@ -29,7 +29,7 @@ func DeletePost(c *gin.Context) {
 	var state = c.Param("state")
 
 	// connect to the cluster
-	cluster := gocql.NewCluster("127.0.0.1")
+	cluster := gocql.NewCluster(constants.IPAddress)
 	cluster.Keyspace = constants.ClusterKeyspace
 	cluster.ProtoVersion = 4
 	session, _ := cluster.CreateSession()
@@ -65,7 +65,7 @@ func ShowPost(c *gin.Context) {
 	var latitude, longitude float64
 
 	// connect to the cluster
-	cluster := gocql.NewCluster("127.0.0.1")
+	cluster := gocql.NewCluster(constants.IPAddress)
 	cluster.Keyspace = constants.ClusterKeyspace
 	cluster.ProtoVersion = 4
 	session, _ := cluster.CreateSession()
@@ -138,7 +138,7 @@ func EditOrCreatePost(c *gin.Context) {
 	}
 
 	// connect to the cluster
-	cluster := gocql.NewCluster("127.0.0.1")
+	cluster := gocql.NewCluster(constants.IPAddress)
 	cluster.Keyspace = constants.ClusterKeyspace
 	cluster.ProtoVersion = 4
 	session, _ := cluster.CreateSession()
@@ -187,7 +187,7 @@ func PostIndex(c *gin.Context) {
 	var latitude, longitude float64
 
 	// connect to the cluster
-	cluster := gocql.NewCluster("127.0.0.1")
+	cluster := gocql.NewCluster(constants.IPAddress)
 	cluster.Keyspace = constants.ClusterKeyspace
 	cluster.ProtoVersion = 4
 	session, _ := cluster.CreateSession()

@@ -10,14 +10,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gocql/gocql"
+	"github.com/terencechow/rent/constants"
 	"github.com/terencechow/rent/models"
 )
-
-// ClusterKeyspace - name of keyspace
-const ClusterKeyspace string = "rent"
-
-// RentSessionCookie is the constant string name used in cookies
-const RentSessionCookie string = "RENT_SESSION_ID"
 
 type key int
 
@@ -36,7 +31,7 @@ func RequestUserFromContext(c *gin.Context) *models.User {
 func SessionMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 
-		cookie, err := c.Cookie(RentSessionCookie)
+		cookie, err := c.Cookie(constants.RentSessionCookie)
 		if err != nil || cookie == "" {
 			// err is not nil then no cookie by that name could be found
 			c.Next()
@@ -45,8 +40,8 @@ func SessionMiddleware() gin.HandlerFunc {
 
 		//a cookie exists, check to ensure it is legit
 		// connect to the cluster
-		cluster := gocql.NewCluster("127.0.0.1")
-		cluster.Keyspace = ClusterKeyspace
+		cluster := gocql.NewCluster(constants.IPAddress)
+		cluster.Keyspace = constants.ClusterKeyspace
 		cluster.ProtoVersion = 4
 		session, _ := cluster.CreateSession()
 		defer session.Close()
