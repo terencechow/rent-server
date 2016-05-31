@@ -1,7 +1,7 @@
 // TODO:
 // 1. double check create user and login user methods. Not entirely sure the methods are proper
 
-package main
+package middleware
 
 import (
 	"crypto/rand"
@@ -10,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gocql/gocql"
+	"github.com/terencechow/rent/models"
 )
 
 // ClusterKeyspace - name of keyspace
@@ -22,15 +23,17 @@ type key int
 
 const userIDKey key = 0
 
-func requestUserFromContext(c *gin.Context) *User {
+//RequestUserFromContext return the current user context or an empty interface
+func RequestUserFromContext(c *gin.Context) *models.User {
 	user, _ := c.Get("user")
 	if user != nil {
-		return user.(*User)
+		return user.(*models.User)
 	}
-	return &User{}
+	return &models.User{}
 }
 
-func sessionMiddleware() gin.HandlerFunc {
+//SessionMiddleware set the current user context
+func SessionMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		cookie, err := c.Cookie(RentSessionCookie)
@@ -57,7 +60,7 @@ func sessionMiddleware() gin.HandlerFunc {
 			c.Next()
 			return
 		}
-		user := User{
+		user := models.User{
 			ID:         id,
 			Name:       name,
 			Email:      email,
@@ -68,7 +71,8 @@ func sessionMiddleware() gin.HandlerFunc {
 	}
 }
 
-func generateSessionID() (string, error) {
+//GenerateSessionID creates a random session id
+func GenerateSessionID() (string, error) {
 	b := make([]byte, 32)
 	_, err := rand.Read(b)
 	// Note that err == nil only if we read len(b) bytes.

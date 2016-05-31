@@ -2,7 +2,11 @@
 
 package main
 
-import "github.com/gin-gonic/gin"
+import (
+	"github.com/gin-gonic/gin"
+	"github.com/terencechow/rent/middleware"
+	"github.com/terencechow/rent/routes"
+)
 
 func main() {
 
@@ -11,22 +15,22 @@ func main() {
 	router.Use(gin.Recovery())
 
 	/** Routes for Posts **/
-	router.GET("/", PostIndex)
-	router.GET("/category/:category", PostIndex)
-	router.GET("/posts/:state/:post_id", ShowPost)
+	router.GET("/", routes.PostIndex)
+	router.GET("/category/:category", routes.PostIndex)
+	router.GET("/posts/:state/:post_id", routes.ShowPost)
 
 	authorized := router.Group("/")
-	authorized.Use(sessionMiddleware())
+	authorized.Use(middleware.SessionMiddleware())
 	{
 		/** Authorized routes for Posts **/
-		authorized.POST("/user/post", EditOrCreatePost)
-		authorized.DELETE("/user/:user_id/category/:category/post/:state/:post_id", DeletePost)
+		authorized.POST("/user/post", routes.EditOrCreatePost)
+		authorized.DELETE("/user/:user_id/category/:category/post/:state/:post_id", routes.DeletePost)
 		/** Routes for Authentication **/
-		authorized.POST("/register", CreateUser)
-		authorized.POST("/edit", EditUser)
-		authorized.POST("/login", LoginUser)
-		authorized.POST("/logout", LogoutUser)
-		authorized.DELETE("/user/:user_id", DeleteUser)
+		authorized.POST("/register", routes.CreateUser)
+		authorized.POST("/edit", routes.EditUser)
+		authorized.POST("/login", routes.LoginUser)
+		authorized.POST("/logout", routes.LogoutUser)
+		authorized.DELETE("/user/:user_id", routes.DeleteUser)
 
 	}
 	router.Run(":8080")

@@ -1,4 +1,4 @@
-package main
+package routes
 
 import (
 	"fmt"
@@ -9,12 +9,15 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gocql/gocql"
+	"github.com/terencechow/rent/constants"
+	"github.com/terencechow/rent/middleware"
+	"github.com/terencechow/rent/models"
 )
 
 // DeletePost route
 // requires url to include post_id, category, string and user_id
 func DeletePost(c *gin.Context) {
-	user := requestUserFromContext(c)
+	user := middleware.RequestUserFromContext(c)
 	if user.ID.String() != c.Param("user_id") && user.ID.String() != "" {
 		fmt.Println("Can't delete post from a different user context")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Can't delete post from a different user context"})
@@ -27,7 +30,7 @@ func DeletePost(c *gin.Context) {
 
 	// connect to the cluster
 	cluster := gocql.NewCluster("127.0.0.1")
-	cluster.Keyspace = ClusterKeyspace
+	cluster.Keyspace = constants.ClusterKeyspace
 	cluster.ProtoVersion = 4
 	session, _ := cluster.CreateSession()
 	defer session.Close()
@@ -44,7 +47,7 @@ func DeletePost(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusInternalServerError, gin.H{"success": "successfully deleted post"})
+	c.JSON(http.StatusOK, gin.H{"success": "successfully deleted post"})
 }
 
 // ShowPost route
@@ -63,7 +66,7 @@ func ShowPost(c *gin.Context) {
 
 	// connect to the cluster
 	cluster := gocql.NewCluster("127.0.0.1")
-	cluster.Keyspace = ClusterKeyspace
+	cluster.Keyspace = constants.ClusterKeyspace
 	cluster.ProtoVersion = 4
 	session, _ := cluster.CreateSession()
 	defer session.Close()
@@ -79,7 +82,7 @@ func ShowPost(c *gin.Context) {
 		return
 	}
 
-	post := Post{
+	post := models.Post{
 		UserID:         userID,
 		PostID:         postID,
 		Category:       category,
@@ -106,7 +109,7 @@ func ShowPost(c *gin.Context) {
 // user_id
 func EditOrCreatePost(c *gin.Context) {
 
-	user := requestUserFromContext(c)
+	user := middleware.RequestUserFromContext(c)
 
 	if user.ID.String() != c.PostForm("user_id") && user.ID.String() != "" {
 		fmt.Println("Can't edit or create a post from a different user context")
@@ -136,7 +139,7 @@ func EditOrCreatePost(c *gin.Context) {
 
 	// connect to the cluster
 	cluster := gocql.NewCluster("127.0.0.1")
-	cluster.Keyspace = ClusterKeyspace
+	cluster.Keyspace = constants.ClusterKeyspace
 	cluster.ProtoVersion = 4
 	session, _ := cluster.CreateSession()
 	defer session.Close()
@@ -185,7 +188,7 @@ func PostIndex(c *gin.Context) {
 
 	// connect to the cluster
 	cluster := gocql.NewCluster("127.0.0.1")
-	cluster.Keyspace = ClusterKeyspace
+	cluster.Keyspace = constants.ClusterKeyspace
 	cluster.ProtoVersion = 4
 	session, _ := cluster.CreateSession()
 	defer session.Close()
@@ -232,12 +235,12 @@ func PostIndex(c *gin.Context) {
 
 	iter := query.Iter()
 
-	var posts []Post
+	var posts []models.Post
 
 	for iter.Scan(&userID, &postID, &category, &title, &description, &price, &deposit,
 		&available, &lastUpdateTime, &imageUrls, &city, &state,
 		&latitude, &longitude) {
-		post := Post{
+		post := models.Post{
 			UserID:         userID,
 			PostID:         postID,
 			Category:       category,

@@ -2,7 +2,7 @@
 // 1. double check create user and login user methods. Not entirely sure the methods are proper
 // 2. pass the session key through the http header, not as a variable in the param
 
-package main
+package routes
 
 import (
 	"crypto/hmac"
@@ -15,6 +15,8 @@ import (
 	"github.com/gebi/scryptauth"
 	"github.com/gin-gonic/gin"
 	"github.com/gocql/gocql"
+	"github.com/terencechow/rent/constants"
+	"github.com/terencechow/rent/middleware"
 )
 
 // HmacSecretKey is the secret key that hmac is generated on
@@ -22,7 +24,7 @@ var HmacSecretKey = os.Getenv("HMAC_SECRET_KEY")
 
 //DeleteUser route to delete user
 func DeleteUser(c *gin.Context) {
-	user := requestUserFromContext(c)
+	user := middleware.RequestUserFromContext(c)
 
 	if user.ID.String() != c.Param("user_id") {
 		fmt.Println("Can't delete user from a different user context")
@@ -32,7 +34,7 @@ func DeleteUser(c *gin.Context) {
 
 	// connect to the cluster
 	cluster := gocql.NewCluster("127.0.0.1")
-	cluster.Keyspace = ClusterKeyspace
+	cluster.Keyspace = constants.ClusterKeyspace
 	cluster.ProtoVersion = 4
 	session, _ := cluster.CreateSession()
 	defer session.Close()
@@ -65,7 +67,7 @@ func DeleteUser(c *gin.Context) {
 	//delete user posts
 
 	// name, value, maxAge, path, domain, secure, httpOnly
-	c.SetCookie(RentSessionCookie, "", -1, "", "192.168.2.229", true, true)
+	c.SetCookie(constants.RentSessionCookie, "", -1, "", "192.168.2.229", true, true)
 	c.Redirect(http.StatusSeeOther, "/")
 }
 
@@ -73,7 +75,7 @@ func DeleteUser(c *gin.Context) {
 // requires a post with users email
 func LogoutUser(c *gin.Context) {
 	// check the user logging out matches user's session key
-	user := requestUserFromContext(c)
+	user := middleware.RequestUserFromContext(c)
 
 	if user.Email != c.PostForm("email") && user.Email != "" {
 		fmt.Println("Can't logout user from a different user context")
@@ -83,7 +85,7 @@ func LogoutUser(c *gin.Context) {
 
 	// connect to the cluster
 	cluster := gocql.NewCluster("127.0.0.1")
-	cluster.Keyspace = ClusterKeyspace
+	cluster.Keyspace = constants.ClusterKeyspace
 	cluster.ProtoVersion = 4
 	session, _ := cluster.CreateSession()
 	defer session.Close()
@@ -100,7 +102,7 @@ func LogoutUser(c *gin.Context) {
 	}
 
 	// name, value, maxAge, path, domain, secure, httpOnly
-	c.SetCookie(RentSessionCookie, "", -1, "", "192.168.2.229", true, true)
+	c.SetCookie(constants.RentSessionCookie, "", -1, "", "192.168.2.229", true, true)
 
 	c.Redirect(http.StatusSeeOther, "/")
 }
@@ -110,7 +112,7 @@ func LogoutUser(c *gin.Context) {
 func LoginUser(c *gin.Context) {
 
 	var email = c.PostForm("email")
-	user := requestUserFromContext(c)
+	user := middleware.RequestUserFromContext(c)
 
 	// if we alreay have a user from context, it means we have a valid session_key,
 	if user.Email != "" {
@@ -125,7 +127,7 @@ func LoginUser(c *gin.Context) {
 
 	// connect to the cluster
 	cluster := gocql.NewCluster("127.0.0.1")
-	cluster.Keyspace = ClusterKeyspace
+	cluster.Keyspace = constants.ClusterKeyspace
 	cluster.ProtoVersion = 4
 	session, _ := cluster.CreateSession()
 	defer session.Close()
@@ -174,7 +176,7 @@ func LoginUser(c *gin.Context) {
 	fmt.Println("Login OK")
 
 	// create a session key and update the session key for the user
-	sessionKey, err := generateSessionID()
+	sessionKey, err := middleware.GenerateSessionID()
 	if err != nil {
 		log.Fatal(err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -194,7 +196,7 @@ func LoginUser(c *gin.Context) {
 	}
 
 	// name, value, maxAge, path, domain, secure, httpOnly
-	c.SetCookie(RentSessionCookie, sessionKey, 0, "", "192.168.2.229", true, true)
+	c.SetCookie(constants.RentSessionCookie, sessionKey, 0, "", "192.168.2.229", true, true)
 
 	//redirect to index //TODO: redirect to the path the user was going to
 	c.Redirect(http.StatusSeeOther, "/")
@@ -205,7 +207,7 @@ func LoginUser(c *gin.Context) {
 // requires a name to update the profile name to
 func EditUser(c *gin.Context) {
 
-	user := requestUserFromContext(c)
+	user := middleware.RequestUserFromContext(c)
 	fmt.Println("edit user", user)
 
 	// if we alreay have a user from context, it means we have a valid session_key,
@@ -223,7 +225,7 @@ func EditUser(c *gin.Context) {
 
 	// connect to the cluster
 	cluster := gocql.NewCluster("127.0.0.1")
-	cluster.Keyspace = ClusterKeyspace
+	cluster.Keyspace = constants.ClusterKeyspace
 	cluster.ProtoVersion = 4
 	session, _ := cluster.CreateSession()
 	defer session.Close()
@@ -250,7 +252,7 @@ func EditUser(c *gin.Context) {
 func CreateUser(c *gin.Context) {
 
 	// check the user logging out matches user's session key
-	user := requestUserFromContext(c)
+	user := middleware.RequestUserFromContext(c)
 
 	fmt.Println(user.Email)
 	if user.Email != "" {
@@ -288,12 +290,12 @@ func CreateUser(c *gin.Context) {
 
 	// connect to the cluster
 	cluster := gocql.NewCluster("127.0.0.1")
-	cluster.Keyspace = ClusterKeyspace
+	cluster.Keyspace = constants.ClusterKeyspace
 	cluster.ProtoVersion = 4
 	session, _ := cluster.CreateSession()
 	defer session.Close()
 
-	sessionKey, err := generateSessionID()
+	sessionKey, err := middleware.GenerateSessionID()
 	if err != nil {
 		fmt.Println(err)
 		log.Fatal(err)
@@ -336,7 +338,7 @@ func CreateUser(c *gin.Context) {
 	}
 
 	// name, value, maxAge, path, domain, secure, httpOnly
-	c.SetCookie(RentSessionCookie, sessionKey, 0, "", "192.168.2.229", true, true)
+	c.SetCookie(constants.RentSessionCookie, sessionKey, 0, "", "192.168.2.229", true, true)
 
 	c.Redirect(http.StatusSeeOther, "/")
 }
