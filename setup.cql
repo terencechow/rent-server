@@ -24,7 +24,7 @@ CREATE TABLE users_by_email(
 	session_key text,
 	PRIMARY KEY(email));
 
-CREATE MATERIALIZED VIEW users_by_session_key AS SELECT 
+CREATE MATERIALIZED VIEW users_by_session_key AS SELECT
 	id, name, email, hash, session_key FROM users
 	WHERE id IS NOT NULL AND session_key IS NOT NULL
 	PRIMARY KEY (session_key, id);
@@ -33,52 +33,52 @@ CREATE TABLE posts(
 	user_id uuid,
 	post_id uuid,
 	category text,
-	name text,
+	title text,
 	description text,
 	price int,
 	deposit int,
-	minimum_rental_days int,
-	next_available_date timestamp,
+	available boolean,
+	last_update_time timestamp,
 	image_urls set<text>,
 	city text,
 	state text,
-	latitude float,
-	longitude float,
-	PRIMARY KEY((state, post_id), next_available_date)) WITH CLUSTERING ORDER BY (next_available_date DESC);
+	latitude double,
+	longitude double,
+	PRIMARY KEY((state), post_id));
 
 CREATE TABLE posts_by_category(
 	user_id uuid,
 	post_id uuid,
 	category text,
-	name text,
+	title text,
 	description text,
 	price int,
 	deposit int,
-	minimum_rental_days int,
-	next_available_date timestamp,
+	available boolean,
+	last_update_time timestamp,
 	image_urls set<text>,
 	city text,
 	state text,
-	latitude float,
-	longitude float,
-	PRIMARY KEY((state, category), next_available_date, post_id)) WITH CLUSTERING ORDER BY (next_available_date DESC);
+	latitude double,
+	longitude double,
+	PRIMARY KEY((state, category), post_id));
 
 CREATE TABLE posts_by_user(
 	user_id uuid,
 	post_id uuid,
 	category text,
-	name text,
+	title text,
 	description text,
 	price int,
 	deposit int,
-	minimum_rental_days int,
-	next_available_date timestamp,
+	available boolean,
+	last_update_time timestamp,
 	image_urls set<text>,
 	city text,
 	state text,
-	latitude float,
-	longitude float,
-	PRIMARY KEY((user_id), next_available_date, post_id)) WITH CLUSTERING ORDER BY (next_available_date DESC);
+	latitude double,
+	longitude double,
+	PRIMARY KEY((user_id), post_id));
 
 CREATE TABLE chats(
 	chat_id uuid,
@@ -110,12 +110,11 @@ WITH OPTIONS = {
     'refresh_seconds' : '60',
     'schema' : '{
         fields : {
-            name  							: {type : "text", analyzer : "english"},
+						available  					: {type : "boolean"},
+            title  							: {type : "text", analyzer : "english"},
 						description  				: {type : "text", analyzer : "english"},
 						price		  					: {type : "integer"},
 						deposit					  	: {type : "integer"},
-						minimum_rental_days : {type : "integer"},
-            next_available_date : {type : "date", pattern : "yyyy/MM/dd"},
 						place 							: {type : "geo_point", latitude: "latitude", longitude: "longitude"}
         }
     }'
@@ -128,12 +127,11 @@ WITH OPTIONS = {
     'schema' : '{
         fields : {
             category  					: {type : "string"},
-            name  							: {type : "text", analyzer : "english"},
+						available  					: {type : "boolean"},
+            title  							: {type : "text", analyzer : "english"},
 						description  				: {type : "text", analyzer : "english"},
 						price		  					: {type : "integer"},
 						deposit					  	: {type : "integer"},
-						minimum_rental_days : {type : "integer"},
-            next_available_date : {type : "date", pattern : "yyyy/MM/dd"},
 						place 							: {type : "geo_point", latitude: "latitude", longitude: "longitude"}
         }
     }'

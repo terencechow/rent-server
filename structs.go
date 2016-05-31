@@ -8,20 +8,20 @@ import (
 
 // Post json structure
 type Post struct {
-	UserID            gocql.UUID `json:"userID"`
-	PostID            gocql.UUID `json:"postID"`
-	Category          string     `json:"category"`
-	Name              string     `json:"name"`
-	Description       string     `json:"description"`
-	Price             int        `json:"price"`
-	Deposit           int        `json:"deposit"`
-	MinimumRentalDays int        `json:"minimumRentalDays"`
-	NextAvailableDate time.Time  `json:"nextAvailableDate"`
-	ImageUrls         []string   `json:"imageUrls"`
-	City              string     `json:"city"`
-	State             string     `json:"state"`
-	Latitude          float64    `json:"latitude"`
-	Longitude         float64    `json:"longitude"`
+	UserID         gocql.UUID `json:"userID"`
+	PostID         gocql.UUID `json:"postID"`
+	Category       string     `json:"category"`
+	Title          string     `json:"title"`
+	Description    string     `json:"description"`
+	Price          int        `json:"price"`
+	Deposit        int        `json:"deposit"`
+	Available      bool       `json:"available"`
+	LastUpdateTime time.Time  `json:"lastUpdateTime"`
+	ImageUrls      []string   `json:"imageUrls"`
+	City           string     `json:"city"`
+	State          string     `json:"state"`
+	Latitude       float64    `json:"latitude"`
+	Longitude      float64    `json:"longitude"`
 }
 
 // User json structure

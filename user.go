@@ -66,7 +66,7 @@ func DeleteUser(c *gin.Context) {
 
 	// name, value, maxAge, path, domain, secure, httpOnly
 	c.SetCookie(RentSessionCookie, "", -1, "", "192.168.2.229", true, true)
-	c.Redirect(http.StatusFound, "/")
+	c.Redirect(http.StatusSeeOther, "/")
 }
 
 // LogoutUser route
@@ -102,7 +102,7 @@ func LogoutUser(c *gin.Context) {
 	// name, value, maxAge, path, domain, secure, httpOnly
 	c.SetCookie(RentSessionCookie, "", -1, "", "192.168.2.229", true, true)
 
-	c.Redirect(http.StatusFound, "/")
+	c.Redirect(http.StatusSeeOther, "/")
 }
 
 // LoginUser route
@@ -117,7 +117,7 @@ func LoginUser(c *gin.Context) {
 		fmt.Println("User is logged in by sessionKey", user.Email)
 
 		//redirect to index //TODO: redirect to the path the user was going to
-		c.Redirect(http.StatusFound, "/")
+		c.Redirect(http.StatusSeeOther, "/")
 		return
 	}
 
@@ -197,7 +197,7 @@ func LoginUser(c *gin.Context) {
 	c.SetCookie(RentSessionCookie, sessionKey, 0, "", "192.168.2.229", true, true)
 
 	//redirect to index //TODO: redirect to the path the user was going to
-	c.Redirect(http.StatusFound, "/")
+	c.Redirect(http.StatusSeeOther, "/")
 }
 
 // EditUser route
@@ -242,7 +242,7 @@ func EditUser(c *gin.Context) {
 	}
 
 	//redirect to index //TODO: redirect to the path the user was going to
-	c.Redirect(http.StatusFound, "/")
+	c.Redirect(http.StatusSeeOther, "/")
 }
 
 // CreateUser route
@@ -338,5 +338,5 @@ func CreateUser(c *gin.Context) {
 	// name, value, maxAge, path, domain, secure, httpOnly
 	c.SetCookie(RentSessionCookie, sessionKey, 0, "", "192.168.2.229", true, true)
 
-	c.Redirect(http.StatusFound, "/")
+	c.Redirect(http.StatusSeeOther, "/")
 }

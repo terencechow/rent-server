@@ -1,15 +1,6 @@
-/*
-
-TODOs:
-3) handle the images array in EditOrCreatePost
-4) Redirect ShowPost to a 'not found page' when no results are found
-
-*/
-
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -20,7 +11,8 @@ import (
 	"github.com/gocql/gocql"
 )
 
-// DeletePost Route to delete a post
+// DeletePost route
+// requires url to include post_id, category, string and user_id
 func DeletePost(c *gin.Context) {
 	user := requestUserFromContext(c)
 	if user.ID.String() != c.Param("user_id") && user.ID.String() != "" {
@@ -46,25 +38,26 @@ func DeletePost(c *gin.Context) {
 		WHERE state = ? and category = ? and post_id = ?`
 	postsUserStatement := `DELETE FROM posts_by_user WHERE user_id = ? and post_id = ?`
 	batch.Query(postsStatement, state, postID)
-	batch.Query(postsCategoryStatement, state, category)
+	batch.Query(postsCategoryStatement, state, category, postID)
 	batch.Query(postsUserStatement, user.ID, postID)
 	if err := session.ExecuteBatch(batch); err != nil {
-		log.Fatal(err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.Redirect(http.StatusFound, "/")
+	c.JSON(http.StatusInternalServerError, gin.H{"success": "successfully deleted post"})
 }
 
-// ShowPost Route to show a post
+// ShowPost route
+// requires state and post_id in the url
 func ShowPost(c *gin.Context) {
 
 	var postIDFromURL = c.Param("post_id")
 	var stateFromURL = c.Param("state")
 	var userID, postID gocql.UUID
-	var category, name, description, city, state string
-	var price, deposit, minimumRentalDays int
-	var nextAvailableDate string
+	var category, title, description, city, state string
+	var price, deposit int
+	var available bool
+	var lastUpdateTime time.Time
 	var imageUrls []string
 	var latitude, longitude float64
 
@@ -76,39 +69,41 @@ func ShowPost(c *gin.Context) {
 	defer session.Close()
 
 	if err := session.Query(`SELECT
-		user_id, post_id, category, name, description, price, deposit, minimum_rental_days,
- 	 next_available_date, image_urls, city, state, latitude, longitude
+		user_id, post_id, category, title, description, price, deposit, available,
+ 	 last_update_time, image_urls, city, state, latitude, longitude
    FROM posts WHERE state = ? and post_id = ? LIMIT 1`,
-		stateFromURL, postIDFromURL).Scan(&userID, &postID, &category, &name, &description,
-		&price, &deposit, &minimumRentalDays, &nextAvailableDate, &imageUrls, &latitude, &longitude); err != nil {
+		stateFromURL, postIDFromURL).Scan(&userID, &postID, &category, &title, &description,
+		&price, &deposit, &available, &lastUpdateTime, &imageUrls, &city, &state, &latitude, &longitude); err != nil {
 
-		c.Redirect(http.StatusFound, "/")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	shortForm, _ := time.Parse(nextAvailableDate, "2013-Feb-03")
 	post := Post{
-		UserID:            userID,
-		PostID:            postID,
-		Category:          category,
-		Name:              name,
-		Description:       description,
-		Price:             price,
-		Deposit:           deposit,
-		MinimumRentalDays: minimumRentalDays,
-		NextAvailableDate: shortForm,
-		ImageUrls:         imageUrls,
-		City:              city,
-		State:             state,
-		Latitude:          latitude,
-		Longitude:         longitude}
+		UserID:         userID,
+		PostID:         postID,
+		Category:       category,
+		Title:          title,
+		Description:    description,
+		Price:          price,
+		Deposit:        deposit,
+		Available:      available,
+		LastUpdateTime: lastUpdateTime,
+		ImageUrls:      imageUrls,
+		City:           city,
+		State:          state,
+		Latitude:       latitude,
+		Longitude:      longitude}
 
-	postJSON, _ := json.Marshal(post)
-
-	c.JSON(http.StatusOK, postJSON)
+	c.JSON(http.StatusOK, post)
 }
 
-// EditOrCreatePost route to create or update a post
+// EditOrCreatePost route
+// requires a form with the following:
+// post_id, category, title, description,
+// price, deposit, available
+// city, state, latitude, longitude
+// user_id
 func EditOrCreatePost(c *gin.Context) {
 
 	user := requestUserFromContext(c)
@@ -118,19 +113,20 @@ func EditOrCreatePost(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Can't edit or create a post from a different user context"})
 		return
 	}
+	fmt.Println("USER IS", user)
 
 	var postID = c.PostForm("post_id")
 	var category = c.PostForm("category")
-	var name = c.PostForm("name")
+	var title = c.PostForm("title")
 	var description = c.PostForm("description")
 	price, _ := strconv.Atoi(c.PostForm("price"))
 	deposit, _ := strconv.Atoi(c.PostForm("deposit"))
-	minimumRentalDays, _ := strconv.Atoi(c.PostForm("minimumRentalDays"))
-	nextAvailableDate := c.PostForm("nextAvailableDate")
+	available, _ := strconv.ParseBool(c.PostForm("available"))
+	lastUpdateTime := time.Now()
 	var city = c.PostForm("city")
 	var state = c.PostForm("state")
-	var latitude = c.PostForm("latitude")
-	var longitude = c.PostForm("longitude")
+	latitude, _ := strconv.ParseFloat(c.PostForm("latitude"), 64)
+	longitude, _ := strconv.ParseFloat(c.PostForm("longitude"), 64)
 
 	var imageUrls []string
 
@@ -147,41 +143,43 @@ func EditOrCreatePost(c *gin.Context) {
 
 	batch := gocql.NewBatch(gocql.LoggedBatch)
 	postsStatement := `INSERT INTO posts
-		(user_id, post_id, category, name, description, price, deposit, minimum_rental_days,
-			next_available_date, image_urls, city, state, latitude, longitude)
+		(user_id, post_id, category, title, description, price, deposit, available,
+			last_update_time, image_urls, city, state, latitude, longitude)
 		VALUES (?,?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	postsCategoryStatement := `INSERT INTO posts_by_category
-		(user_id, post_id, category, name, description, price, deposit, minimum_rental_days,
-			next_available_date, image_urls, city, state, latitude, longitude)
+	(user_id, post_id, category, title, description, price, deposit, available,
+		last_update_time, image_urls, city, state, latitude, longitude)
 		VALUES (?,?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	postsUserStatement := `INSERT INTO posts_by_user
-		(user_id, post_id, category, name, description, price, deposit, minimum_rental_days,
-			next_available_date, image_urls, city, state, latitude, longitude)
+	(user_id, post_id, category, title, description, price, deposit, available,
+		last_update_time, image_urls, city, state, latitude, longitude)
 		VALUES (?,?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-	batch.Query(postsStatement, user.ID, postID, category, name, description, price,
-		deposit, minimumRentalDays, nextAvailableDate, imageUrls, city, state,
+	batch.Query(postsStatement, user.ID, postID, category, title, description, price,
+		deposit, available, lastUpdateTime, imageUrls, city, state,
 		latitude, longitude)
-	batch.Query(postsCategoryStatement, user.ID, postID, category, name, description, price,
-		deposit, minimumRentalDays, nextAvailableDate, imageUrls, city, state,
+	batch.Query(postsCategoryStatement, user.ID, postID, category, title, description, price,
+		deposit, available, lastUpdateTime, imageUrls, city, state,
 		latitude, longitude)
-	batch.Query(postsUserStatement, user.ID, postID, category, name, description, price,
-		deposit, minimumRentalDays, nextAvailableDate, imageUrls, city, state,
+	batch.Query(postsUserStatement, user.ID, postID, category, title, description, price,
+		deposit, available, lastUpdateTime, imageUrls, city, state,
 		latitude, longitude)
 	if err := session.ExecuteBatch(batch); err != nil {
 		log.Fatal(err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.Redirect(http.StatusFound, "/")
+
+	c.Redirect(http.StatusSeeOther, "/?latitude="+c.PostForm("latitude")+"&longitude="+c.PostForm("longitude"))
 }
 
 //PostIndex route to show posts or a category of posts
 func PostIndex(c *gin.Context) {
 
 	var userID, postID gocql.UUID
-	var category, name, description, city, state string
-	var price, deposit, minimumRentalDays int
-	var nextAvailableDate string
+	var category, title, description, city, state string
+	var price, deposit int
+	var available bool
+	var lastUpdateTime time.Time
 	var imageUrls []string
 	var latitude, longitude float64
 
@@ -196,72 +194,74 @@ func PostIndex(c *gin.Context) {
 	userLatitude := c.Query("latitude")
 	userLongitude := c.Query("longitude")
 
+	if userLatitude == "" || userLongitude == "" {
+		fmt.Println("Missing latitude or longitude!")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Missing latitude or longitude"})
+		return
+	}
+
 	var query *gocql.Query
 
 	if searchCategory == "" {
+
+		var luceneQuery = `{
+			filter: { type: "match", field: "available", value: "true"},
+			query: { type: "geo_distance", field: "place", latitude:` + userLatitude + `, longitude: ` + userLongitude +
+			`, max_distance: "20km"}}`
+
 		query = session.Query(`SELECT
-			user_id, post_id, category, name, description, price, deposit, minimum_rental_days,
-			next_available_date, image_urls, city, state, latitude, longitude
-  		FROM posts WHERE expr(posts_index,'{
-				query:{
-					type: "geo_distance",
-					field: "place",
-					latitude: ?,
-					longitude: ?,
-					max_distance: "20km"
-				}
-			}') LIMIT 100`, userLatitude, userLongitude)
+			user_id, post_id, category, title, description, price, deposit,
+			available, last_update_time, image_urls, city, state, latitude, longitude
+  		FROM posts WHERE expr(posts_index, ?) LIMIT 100`, luceneQuery)
+		fmt.Println("Search category is nil")
 	} else {
+		var luceneQuery = `{
+			filter: {
+				type: "boolean", must:[
+					{type: "match", field: "available", value: "true"},
+					{type: "match", field: "category", value:"` + searchCategory + `"}` +
+			`]
+			},
+			query: {type: "geo_distance", field: "place", latitude:` + userLatitude +
+			`, longitude: ` + userLongitude + `, max_distance: "20km" }}`
 		query = session.Query(`SELECT
-			user_id, post_id, category, name, description, price, deposit, minimum_rental_days,
-			next_available_date, image_urls, city, state, latitude, longitude
-  		FROM posts_by_category WHERE expr(posts_category_index,'{
-				filter: {
-					type: "match",
-					field: "category",
-					value: ? },
-				query:{
-					type: "geo_distance",
-					field: "place",
-					latitude: ?,
-					longitude: ?,
-					max_distance: "20km"
-				}
-			}') LIMIT 100`, searchCategory, userLatitude, userLongitude)
+			user_id, post_id, category, title, description, price, deposit,
+			available, last_update_time, image_urls, city, state, latitude, longitude
+  		FROM posts_by_category WHERE expr(posts_category_index, ?) LIMIT 100`, luceneQuery)
 	}
 
 	iter := query.Iter()
 
 	var posts []Post
 
-	for iter.Scan(&userID, &postID, &category, &name, &description, &price, &deposit,
-		&minimumRentalDays, &nextAvailableDate, &imageUrls, &city, &state,
+	for iter.Scan(&userID, &postID, &category, &title, &description, &price, &deposit,
+		&available, &lastUpdateTime, &imageUrls, &city, &state,
 		&latitude, &longitude) {
-
-		shortForm, _ := time.Parse(nextAvailableDate, "2013-Feb-03")
 		post := Post{
-			UserID:            userID,
-			PostID:            postID,
-			Category:          category,
-			Name:              name,
-			Description:       description,
-			Price:             price,
-			Deposit:           deposit,
-			MinimumRentalDays: minimumRentalDays,
-			NextAvailableDate: shortForm,
-			ImageUrls:         imageUrls,
-			City:              city,
-			State:             state,
-			Latitude:          latitude,
-			Longitude:         longitude}
+			UserID:         userID,
+			PostID:         postID,
+			Category:       category,
+			Title:          title,
+			Description:    description,
+			Price:          price,
+			Deposit:        deposit,
+			Available:      available,
+			LastUpdateTime: lastUpdateTime,
+			ImageUrls:      imageUrls,
+			City:           city,
+			State:          state,
+			Latitude:       latitude,
+			Longitude:      longitude}
 		posts = append(posts, post)
 	}
-	postsJSON, _ := json.Marshal(posts)
+	fmt.Println("Done iterating", posts)
+	// postsJSON, _ := json.Marshal(posts)
 
 	if err := iter.Close(); err != nil {
+		fmt.Println("Error in iter.close", err.Error())
 		log.Fatal(err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, postsJSON)
+	c.JSON(http.StatusOK, posts)
 }
