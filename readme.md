@@ -26,8 +26,7 @@ A backend for a product rental service. Includes:
   - `bin/cqlsh`
 6. In the cqlsh command line type
   - `source /path/to/this/cloned/directory/setup.cql`
-7. The database has been initialized with the correct tables
-8. cd to this cloned directory and run the command
+7. The database will now be initialized with the correct keyspaces and tables. Next cd to this cloned directory and run the command
   - `go install && rent`
 
 You can now hit the local server at `localhost:8080`
