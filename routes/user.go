@@ -26,7 +26,7 @@ var HmacSecretKey = os.Getenv("HMAC_SECRET_KEY")
 func DeleteUser(c *gin.Context) {
 	user := middleware.RequestUserFromContext(c)
 
-	if user.ID.String() != c.Param("user_id") {
+	if user.ID.String() != c.Param("user_id") && user.ID.String() != "" || user.ID.String() == "" {
 		fmt.Println("Can't delete user from a different user context")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Can't delete user from a different user context"})
 		return
@@ -77,7 +77,7 @@ func LogoutUser(c *gin.Context) {
 	// check the user logging out matches user's session key
 	user := middleware.RequestUserFromContext(c)
 
-	if user.Email != c.PostForm("email") && user.Email != "" {
+	if user.Email != c.PostForm("email") && user.Email != "" || user.Email == "" {
 		fmt.Println("Can't logout user from a different user context")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Can't logout user from a different user context"})
 		return
@@ -211,7 +211,7 @@ func EditUser(c *gin.Context) {
 	fmt.Println("edit user", user)
 
 	// if we alreay have a user from context, it means we have a valid session_key,
-	if user.Email != c.PostForm("email") || user.Email == "" {
+	if user.Email != c.PostForm("email") && user.Email != "" || user.Email == "" {
 		fmt.Println("Can't edit user from logged out context or differnt user context", user.Email)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Can't edit user from logged out context or differnt user context"})
 		return

@@ -14,11 +14,64 @@ import (
 	"github.com/terencechow/rent/models"
 )
 
+// PostsByUser route
+// show posts by a user
+func PostsByUser(c *gin.Context) {
+	// connect to the cluster
+	cluster := gocql.NewCluster(constants.IPAddress)
+	cluster.Keyspace = constants.ClusterKeyspace
+	cluster.ProtoVersion = 4
+	session, _ := cluster.CreateSession()
+	defer session.Close()
+
+	var userID, postID gocql.UUID
+	var category, title, description, city, state string
+	var price, deposit int
+	var available bool
+	var lastUpdateTime time.Time
+	var imageUrls []string
+	var latitude, longitude float64
+
+	iter := session.Query(`SELECT user_id, post_id, category, title, description, price, deposit,
+	available, last_update_time, image_urls, city, state, latitude, longitude
+	FROM posts_by_user WHERE user_id = ?`, c.Param("user_id")).Iter()
+
+	var posts []models.Post
+
+	for iter.Scan(&userID, &postID, &category, &title, &description, &price, &deposit,
+		&available, &lastUpdateTime, &imageUrls, &city, &state,
+		&latitude, &longitude) {
+		post := models.Post{
+			UserID:         userID,
+			PostID:         postID,
+			Category:       category,
+			Title:          title,
+			Description:    description,
+			Price:          price,
+			Deposit:        deposit,
+			Available:      available,
+			LastUpdateTime: lastUpdateTime,
+			ImageUrls:      imageUrls,
+			City:           city,
+			State:          state,
+			Latitude:       latitude,
+			Longitude:      longitude}
+		posts = append(posts, post)
+	}
+	if err := iter.Close(); err != nil {
+		fmt.Println("Error in iter.close", err.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, posts)
+}
+
 // DeletePost route
 // requires url to include post_id, category, string and user_id
 func DeletePost(c *gin.Context) {
 	user := middleware.RequestUserFromContext(c)
-	if user.ID.String() != c.Param("user_id") && user.ID.String() != "" {
+
+	if user.ID.String() != c.Param("user_id") && user.ID.String() != "" || user.ID.String() == "" {
 		fmt.Println("Can't delete post from a different user context")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Can't delete post from a different user context"})
 		return
@@ -111,7 +164,7 @@ func EditOrCreatePost(c *gin.Context) {
 
 	user := middleware.RequestUserFromContext(c)
 
-	if user.ID.String() != c.PostForm("user_id") && user.ID.String() != "" {
+	if user.ID.String() != c.PostForm("user_id") && user.ID.String() != "" || user.ID.String() == "" {
 		fmt.Println("Can't edit or create a post from a different user context")
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Can't edit or create a post from a different user context"})
 		return
@@ -262,7 +315,6 @@ func PostIndex(c *gin.Context) {
 
 	if err := iter.Close(); err != nil {
 		fmt.Println("Error in iter.close", err.Error())
-		log.Fatal(err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

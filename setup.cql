@@ -84,22 +84,20 @@ CREATE TABLE chats(
 	chat_id uuid,
 	post_id uuid,
 	user_id uuid,
+	recipient_id uuid,
 	post_name text,
 	main_image_url text,
 	last_message_time timestamp,
-	PRIMARY KEY((chat_id, user_id), last_message_time)) WITH CLUSTERING ORDER BY (last_message_time DESC);
+	PRIMARY KEY((user_id), post_id, recipient_id));
 
 CREATE TABLE messages_by_chat(
 	chat_id uuid,
 	message_time timestamp,
 	message_id uuid,
-	post_id uuid STATIC,
-	post_name text STATIC,
 	owner_id uuid STATIC,
 	owner_name text STATIC,
 	borrower_id uuid STATIC,
 	borrower_name text STATIC,
-	main_image_url text STATIC,
 	message_content text,
 	message_sender_id uuid,
 	PRIMARY KEY((chat_id), message_time, message_id)) WITH CLUSTERING ORDER BY (message_time DESC);
