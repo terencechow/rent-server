@@ -16,7 +16,7 @@ func main() {
 
 	/** Routes for Posts **/
 	router.GET("/posts", routes.PostIndex)
-	router.GET("/posts/:category", routes.PostIndex)
+	router.GET("/posts/category/:category", routes.PostIndex)
 	router.GET("/posts/user/:user_id", routes.PostsByUser)
 	router.GET("/posts/state/:state/:post_id", routes.ShowPost)
 

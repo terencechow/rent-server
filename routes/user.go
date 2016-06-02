@@ -68,7 +68,7 @@ func DeleteUser(c *gin.Context) {
 
 	// name, value, maxAge, path, domain, secure, httpOnly
 	c.SetCookie(constants.RentSessionCookie, "", -1, "", "", true, true)
-	c.Redirect(http.StatusSeeOther, "/")
+	c.JSON(http.StatusOK, gin.H{"success": "Successfully deleted user"})
 }
 
 // LogoutUser route
@@ -243,8 +243,7 @@ func EditUser(c *gin.Context) {
 		return
 	}
 
-	//redirect to index //TODO: redirect to the path the user was going to
-	c.Redirect(http.StatusSeeOther, "/")
+	c.JSON(http.StatusOK, gin.H{"success": "Successfully updated user"})
 }
 
 // CreateUser route
@@ -340,5 +339,5 @@ func CreateUser(c *gin.Context) {
 	// name, value, maxAge, path, domain, secure, httpOnly
 	c.SetCookie(constants.RentSessionCookie, sessionKey, 0, "", "", true, true)
 
-	c.Redirect(http.StatusSeeOther, "/")
+	c.JSON(http.StatusOK, gin.H{"success": "successfully created user"})
 }

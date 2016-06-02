@@ -31,16 +31,21 @@ A backend for a product rental service. Includes:
 
 You can now hit the local server at `localhost:8080`
 
-<!-- #### Routes
+#### Routes
 | Method | Route | Requires Login | Query Params | Post Params | Return |
 |---|---|---|
-| GET | / | No  | latitude=12.23&longitude=23.33 | none | List of Posts near you |
-| GET  |   |   |
-|   |   |   |
-|   |   |   |
-|   |   |   |
-|   |   |   |
-|   |   |   |
-|   |   |   |
-|   |   |   |
-|   |   |   | -->
+| GET | /posts | No  | latitude=?&longitude=? | none | List of Posts nearby |
+| GET  | /posts/category/:category  | no | latitude=?&longitude=? | none | List of Posts nearby by Category |
+| GET  | /posts/user/:user_id  | no  | none | none | List of posts for a user |
+| GET  |  /posts/state/:state/:post_id | no  | none | none | a post |
+| POST  | /posts/create or /posts/edit | yes  | none | post_id, category, title, description, price, deposit, available, city, state, latitude, longitude, user_id | Success or Error message on an edit or create |
+| DELETE   | /posts/state/:state/category/:category/user/:user_id/:post_id  | yes  | none | none | Success or Error message |
+| POST  | /register  | no  | none | name, password and email | Success or Error Message |
+| POST  | /login  | no  | none | email, password | Redirect to Posts Index
+| POST  | /logout  | yes  | none | email | Redirect to Posts Index
+| POST  | /user/edit  | yes  | none | email, name | Success or Error Message |
+| DELETE | /user/:user_id | yes | none | none | Success or Error Message |
+| GET | /chats/user/:user_id | yes | none | none | List of chats for the user |
+| GET | /chats/user/:user_id/:chat_id | yes | none | none | List of messages for a chat |
+| POST | /chats/create | yes | none | user_id, recipient_id, post_id, post_name, main_image_url, recipient_name, message_content | Success or Error message |
+| POST | /chats/message/create | yes | none | user_id, chat_id, message_content, post_id, recipientId | Success or Error Message |

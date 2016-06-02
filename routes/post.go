@@ -225,7 +225,7 @@ func EditOrCreatePost(c *gin.Context) {
 		return
 	}
 
-	c.Redirect(http.StatusSeeOther, "/?latitude="+c.PostForm("latitude")+"&longitude="+c.PostForm("longitude"))
+	c.JSON(http.StatusOK, gin.H{"success": "Successfully created post"})
 }
 
 //PostIndex route to show posts or a category of posts
