@@ -33,7 +33,7 @@ You can now hit the local server at `localhost:8080`
 
 #### Routes
 | Method | Route | Requires Login | Query Params | Post Params | Return |
-|---|---|---|
+|---|---|---|---|---|---|
 | GET | /posts | No  | latitude=?&longitude=? | none | List of Posts nearby |
 | GET  | /posts/category/:category  | no | latitude=?&longitude=? | none | List of Posts nearby by Category |
 | GET  | /posts/user/:user_id  | no  | none | none | List of posts for a user |
